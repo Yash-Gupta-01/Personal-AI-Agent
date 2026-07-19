@@ -24,4 +24,8 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+
+    // Speech is exposed as a Flow, so coroutines is an api dependency: callers
+    // in :app consume the Flow type directly.
+    api(libs.kotlinx.coroutines.core)
 }
