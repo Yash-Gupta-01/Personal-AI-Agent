@@ -32,6 +32,15 @@ data class Memory(
     fun withContent(newContent: String, now: Instant = Instant.now()): Memory =
         copy(content = newContent.trim(), updatedAt = now)
 
+    /**
+     * Returns a copy classified as [newType], advancing [updatedAt].
+     *
+     * This is the first way a memory changes without the user touching it —
+     * the point at which memory starts evolving on its own.
+     */
+    fun withType(newType: MemoryType, now: Instant = Instant.now()): Memory =
+        copy(type = newType, updatedAt = now)
+
     companion object {
         /**
          * Creates a newly captured memory.
