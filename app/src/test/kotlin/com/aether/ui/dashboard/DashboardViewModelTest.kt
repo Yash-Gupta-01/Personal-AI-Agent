@@ -81,6 +81,28 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun `capture stores the typed content`() = runTest {
+        val viewModel = DashboardViewModel(repository)
+
+        viewModel.capture("Renew the passport")
+
+        val stored = viewModel.uiState.first { !it.isEmpty }.days.single().memories.single()
+        assertEquals("Renew the passport", stored.content)
+        assertEquals(MemorySource.MANUAL_TEXT, stored.source)
+    }
+
+    @Test
+    fun `blank captures are ignored`() = runTest {
+        val viewModel = DashboardViewModel(repository)
+
+        viewModel.capture("   ")
+
+        // A mis-tap should quietly do nothing rather than store an empty card
+        // or raise an error the user cannot act on.
+        assertTrue(viewModel.uiState.value.isEmpty)
+    }
+
+    @Test
     fun `updates when a memory is captured`() = runTest {
         val viewModel = DashboardViewModel(repository)
         assertTrue(viewModel.uiState.value.isEmpty)

@@ -2,14 +2,17 @@ package com.aether.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryDay
 import com.aether.domain.memory.MemoryRepository
+import com.aether.domain.memory.MemorySource
 import com.aether.domain.memory.groupByDay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -39,6 +42,19 @@ class DashboardViewModel @Inject constructor(
                 started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
                 initialValue = DashboardUiState(),
             )
+
+    /**
+     * Stores a captured thought.
+     *
+     * Blank input is ignored rather than surfaced as an error: an empty
+     * capture is a mis-tap, and scolding the user for one helps nobody.
+     */
+    fun capture(content: String, source: MemorySource = MemorySource.MANUAL_TEXT) {
+        if (content.isBlank()) return
+        viewModelScope.launch {
+            repository.save(Memory.capture(content, source))
+        }
+    }
 
     private companion object {
         // Keeps the flow alive briefly across configuration changes so a
