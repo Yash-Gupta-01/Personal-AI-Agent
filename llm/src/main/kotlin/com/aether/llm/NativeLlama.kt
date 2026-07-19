@@ -7,9 +7,10 @@ package com.aether.llm
  * swapping llama.cpp for another runtime means replacing this file and its DI
  * binding — not touching assistant logic.
  *
- * Currently a probe only. Model loading and generation land in the next commit;
- * this exists to prove the NDK toolchain, CMake and llama.cpp actually link and
- * resolve on arm64 before any real bindings depend on that.
+ * Handles are raw native pointers. [freeModel] must be called exactly once for
+ * every non-zero handle from [loadModel]; calling into a freed handle is a
+ * SIGSEGV, not an exception. [LlamaCppClient] owns that lifecycle so no other
+ * code has to think about it.
  */
 internal object NativeLlama {
 
@@ -32,4 +33,19 @@ internal object NativeLlama {
 
     /** Resolves a trivial native symbol; proves JNI wiring end to end. */
     external fun isLoaded(): Boolean
+
+    /** Returns an opaque handle, or 0 if the model could not be loaded. */
+    external fun loadModel(modelPath: String, contextSize: Int, threads: Int): Long
+
+    /** Releases a handle. Safe to call with 0. */
+    external fun freeModel(handle: Long)
+
+    /**
+     * Formats [userMessage] with the model's own chat template from its GGUF
+     * metadata, or returns null if the model carries none.
+     */
+    external fun applyChatTemplate(handle: Long, userMessage: String): String?
+
+    /** Generates up to [maxTokens], or null on failure. */
+    external fun generate(handle: Long, prompt: String, maxTokens: Int): String?
 }

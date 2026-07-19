@@ -98,6 +98,8 @@ Newest last. Each row is a decision that would otherwise have to be re-derived.
 | 2026-07-19 | **`LlmClient` exposes `generate()` only** | `embeddings()` arrives with semantic search in M4; `tokenize()`/`healthCheck()` when a caller exists. An unimplemented method is a burden every future backend must satisfy, including the LiteRT-LM fallback. |
 | 2026-07-19 | **All commits are made by the user, not the assistant** | Authorship and commit granularity stay under human control. The assistant writes and verifies code and leaves the working tree staged-ready; the user reviews and commits. |
 | 2026-07-19 | **Repo-local git identity** (`Yash Gupta <guptayash112003@gmail.com>`) | This is a personal project; the global identity is a work account. Set at repo scope only, so other repositories are unaffected. Commits before this date carry the work email. |
+| 2026-07-20 | **Model: LFM2.5-1.2B-Instruct `Q4_K_M`** (697MB, `LiquidAI/LFM2.5-1.2B-Instruct-GGUF`) | Verified against pinned llama.cpp before choosing: `LLM_ARCH_LFM2` supported, ChatML-like template so llama.cpp's heuristic detector recognises it, and no thinking mode — which matters because an 8-token budget would otherwise return an unterminated `<think>` block. Hybrid conv design targets fast prefill, and prefill is our real cost since classification generates ~8 tokens. Licence is LFM1.0 (not OSI); Qwen3.5-0.8B (Apache-2.0, 507MB) is the known-good fallback. |
+| 2026-07-20 | **Model lives in internal storage**, staged via external | Aether's premise is that nothing leaves the device, and `/sdcard/Android/data/<pkg>` is reachable over adb and by some file managers. DownloadManager cannot write to internal storage, so it stages to external and `promoteStagedModel()` copies it in once. |
 | 2026-07-19 | **Never ask a small model for JSON** | 1.5B models emit malformed JSON often enough to be a real failure source. Classification asks for one word from a closed set and validates against the enum, falling back to `UNCLASSIFIED`. Robust by construction, not by prompt-begging. |
 
 ---
@@ -128,8 +130,10 @@ action. The type appears on the card. First milestone where memory evolves on it
 - [x] 1 · `feat(domain): memory classification prompt and parser` — 38 domain tests green
 - [x] 2 · `build(llm): llama.cpp native build via NDK` — submodule pinned to `b10068`,
       NDK 28.2.13676358, `arm64-v8a` only, 3/3 native tests green on device
-- [ ] 3 · `feat(llm): JNI bindings and llama.cpp inference client`
-- [ ] 4 · `feat(llm): model download with progress` ← **confirm exact GGUF repo with user first**
+- [x] 3 · `feat(llm): JNI bindings and llama.cpp inference client` — model-dependent
+      tests skip cleanly until a GGUF is present
+- [x] 4 · `feat(llm): model download with progress` — LFM2.5 downloaded and classifying
+      correctly on device; `chat_template=present`, 3 inference tests green
 - [ ] 5 · `feat(data): unclassified query and schema v2 migration`
 - [ ] 6 · `feat(app): background classification with type on cards` ← the payoff
 - [ ] 7 · `docs: update README and plan.md`
@@ -207,4 +211,23 @@ Hard-won; each of these cost real time.
   for its own reason is worse than no test.
 - **The submodule must be initialised** before `:llm` builds: `git submodule update --init
   --depth 1`. A plain `git clone` gives a confusing CMake failure on a new machine.
+- **The model never needs re-downloading.** A master copy lives at
+  `/sdcard/aether/model.gguf`, which survives uninstalls because it is shared storage.
+  Restore it into an app with:
+  ```bash
+  adb shell "cat /sdcard/aether/model.gguf | run-as <pkg> sh -c 'cat > files/models/LFM2.5-1.2B-Instruct-Q4_K_M.gguf'"
+  ```
+  `run-as` works because debug builds are debuggable; it reaches internal storage, which
+  plain `adb shell` cannot.
+- **You cannot seed a file into another app's external dir.** On Android 11+,
+  `/sdcard/Android/data/<pkg>` is per-app: a file written there by `shell` is simply invisible
+  to the app, with no error — `exists=false` on the exact path where `ls` shows it. This is
+  why `:llm`'s inference tests are seeded into *internal* storage via the pipe above, and why
+  `connectedAndroidTest` cannot be used for them (it reinstalls the test APK, wiping the seed).
+  Run them directly instead:
+  ```bash
+  ./gradlew :llm:installDebugAndroidTest     # then seed, then:
+  adb shell am instrument -w -e class com.aether.llm.LlamaCppClientTest \
+      com.aether.llm.test/androidx.test.runner.AndroidJUnitRunner
+  ```
 - Never run the emulator: 4 cores and 16GB are shared with Android Studio.

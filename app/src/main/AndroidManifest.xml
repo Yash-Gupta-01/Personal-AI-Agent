@@ -5,6 +5,12 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!--
+      Used for exactly one thing: downloading the on-device model. Aether sends
+      nothing anywhere — inference, storage and classification are all local.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
       Without this, package visibility filtering on Android 11+ hides every
       RecognitionService, so SpeechRecognizer.isRecognitionAvailable() returns
       false even when a recogniser is installed.

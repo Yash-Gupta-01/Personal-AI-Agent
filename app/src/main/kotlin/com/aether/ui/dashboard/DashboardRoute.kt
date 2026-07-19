@@ -13,6 +13,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,10 +27,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aether.ui.capture.QuickCaptureSheet
+import com.aether.ui.model.ModelSetupSheet
 
 object DashboardTestTags {
     const val CAPTURE_FAB = "dashboard_capture_fab"
     const val DELETE_MENU_ITEM = "dashboard_delete_menu_item"
+    const val MODEL_SETUP_ACTION = "dashboard_model_setup_action"
 }
 
 /**
@@ -48,6 +51,7 @@ fun DashboardRoute(
     // the app is backgrounded rather than holding a database subscription open.
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var isCapturing by remember { mutableStateOf(false) }
+    var isSettingUpModel by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -58,6 +62,12 @@ fun DashboardRoute(
             TopAppBar(
                 title = {
                     Text(text = "Aether", style = MaterialTheme.typography.titleLarge)
+                },
+                actions = {
+                    TextButton(
+                        onClick = { isSettingUpModel = true },
+                        modifier = Modifier.testTag(DashboardTestTags.MODEL_SETUP_ACTION),
+                    ) { Text("AI") }
                 },
             )
         },
@@ -99,5 +109,9 @@ fun DashboardRoute(
             onDismiss = { isCapturing = false },
             onCapture = viewModel::capture,
         )
+    }
+
+    if (isSettingUpModel) {
+        ModelSetupSheet(onDismiss = { isSettingUpModel = false })
     }
 }
