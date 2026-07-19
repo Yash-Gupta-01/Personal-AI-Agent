@@ -30,3 +30,5 @@ rootProject.name = "Aether"
 //   :llm     Android lib  — local llama.cpp inference
 //   :tools   Android lib  — tool registry, Android API tools
 //   :app     Android app  — Compose UI, ViewModels, DI wiring
+
+include(":domain")
