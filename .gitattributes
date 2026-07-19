@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+# gradlew is a shell script: CRLF endings make it unrunnable.
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+*.jar binary
