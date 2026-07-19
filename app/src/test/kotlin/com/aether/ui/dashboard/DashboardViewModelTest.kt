@@ -103,6 +103,36 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun `delete removes the memory`() = runTest {
+        val viewModel = DashboardViewModel(repository)
+        viewModel.capture("Mistake")
+        val stored = viewModel.uiState.first { !it.isEmpty }.days.single().memories.single()
+
+        viewModel.delete(stored)
+
+        assertTrue(viewModel.uiState.first { it.isEmpty }.isEmpty)
+    }
+
+    @Test
+    fun `restore brings back the memory unchanged`() = runTest {
+        val viewModel = DashboardViewModel(repository)
+        viewModel.capture("Worth keeping after all")
+        val original = viewModel.uiState.first { !it.isEmpty }.days.single().memories.single()
+        viewModel.delete(original)
+        viewModel.uiState.first { it.isEmpty }
+
+        viewModel.restore(original)
+
+        // Undo must restore the original id and timestamps, so the memory
+        // returns to its place in the timeline rather than jumping to the top
+        // as though it were newly captured.
+        val restored = viewModel.uiState.first { !it.isEmpty }.days.single().memories.single()
+        assertEquals(original.id, restored.id)
+        assertEquals(original.createdAt, restored.createdAt)
+        assertEquals(original.content, restored.content)
+    }
+
+    @Test
     fun `updates when a memory is captured`() = runTest {
         val viewModel = DashboardViewModel(repository)
         assertTrue(viewModel.uiState.value.isEmpty)

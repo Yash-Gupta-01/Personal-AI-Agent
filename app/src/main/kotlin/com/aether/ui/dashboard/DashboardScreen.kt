@@ -1,6 +1,9 @@
 package com.aether.ui.dashboard
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,11 +13,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -38,6 +48,7 @@ internal fun DashboardContent(
     state: DashboardUiState,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    onDelete: (Memory) -> Unit = {},
 ) {
     if (state.isEmpty) {
         EmptyState(modifier = modifier.padding(contentPadding))
@@ -54,7 +65,7 @@ internal fun DashboardContent(
                 DayHeader(day = day)
             }
             items(items = day.memories, key = { it.id }) { memory ->
-                MemoryCard(memory = memory)
+                MemoryCard(memory = memory, onDelete = { onDelete(memory) })
             }
         }
     }
@@ -73,26 +84,61 @@ private fun DayHeader(day: MemoryDay, modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * A single memory.
+ *
+ * Delete is a long-press with an overflow menu rather than a swipe. A swipe
+ * would need a visible non-gesture alternative anyway to remain usable with
+ * assistive tech, so it is strictly more code for the same outcome.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MemoryCard(memory: Memory, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = memory.content,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-                text = memory.createdAt.toTimeLabel(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
+private fun MemoryCard(
+    memory: Memory,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Box {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = { showMenu = true },
+                    onLongClickLabel = "Show options",
+                ),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = memory.content,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = memory.createdAt.toTimeLabel(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text("Delete") },
+                modifier = Modifier.testTag(DashboardTestTags.DELETE_MENU_ITEM),
+                onClick = {
+                    showMenu = false
+                    onDelete()
+                },
             )
         }
     }

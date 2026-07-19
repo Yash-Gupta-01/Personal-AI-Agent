@@ -8,13 +8,19 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -23,6 +29,7 @@ import com.aether.ui.capture.QuickCaptureSheet
 
 object DashboardTestTags {
     const val CAPTURE_FAB = "dashboard_capture_fab"
+    const val DELETE_MENU_ITEM = "dashboard_delete_menu_item"
 }
 
 /**
@@ -41,9 +48,12 @@ fun DashboardRoute(
     // the app is backgrounded rather than holding a database subscription open.
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var isCapturing by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -65,6 +75,22 @@ fun DashboardRoute(
         DashboardContent(
             state = state,
             contentPadding = innerPadding,
+            onDelete = { memory ->
+                viewModel.delete(memory)
+                scope.launch {
+                    // Undo restores the exact memory, id and timestamps
+                    // included, so it returns to its original place in the
+                    // timeline rather than reappearing as if newly captured.
+                    val result = snackbarHostState.showSnackbar(
+                        message = "Memory deleted",
+                        actionLabel = "Undo",
+                        duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        viewModel.restore(memory)
+                    }
+                }
+            },
         )
     }
 

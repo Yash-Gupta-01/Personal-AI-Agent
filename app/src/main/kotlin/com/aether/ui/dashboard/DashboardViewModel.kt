@@ -56,6 +56,23 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Deletes a memory, returning it so the caller can offer an undo.
+     *
+     * The memory is handed back rather than soft-deleted with a flag: undo is
+     * simply saving it again, which keeps the storage layer free of a
+     * "deleted but not really" state that every future query would have to
+     * remember to filter out.
+     */
+    fun delete(memory: Memory) {
+        viewModelScope.launch { repository.delete(memory.id) }
+    }
+
+    /** Restores a deleted memory, unchanged including its original id and timestamps. */
+    fun restore(memory: Memory) {
+        viewModelScope.launch { repository.save(memory) }
+    }
+
     private companion object {
         // Keeps the flow alive briefly across configuration changes so a
         // rotation does not re-query the database.
