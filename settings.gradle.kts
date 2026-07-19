@@ -32,4 +32,7 @@ rootProject.name = "Aether"
 //   :app     Android app  — Compose UI, ViewModels, DI wiring
 
 include(":domain")
+include(":data")
+include(":llm")
+include(":tools")
 include(":app")
