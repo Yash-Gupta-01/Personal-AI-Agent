@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      NoActionBar is the point of this file. Without it the platform draws its
+      own ActionBar containing the activity label, which double-draws against
+      Compose's TopAppBar — the app title appears twice.
+
+      Colours are not defined here: Compose owns all rendering via AetherTheme.
+      This theme only shapes the window before Compose takes over, so the
+      night variant exists purely to avoid a white flash on launch in dark mode.
+    -->
+    <style name="Theme.Aether" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
