@@ -1,1 +1,19 @@
-node_modules
+*.iml
+.gradle/
+build/
+local.properties
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Android Studio / IntelliJ — keep the project-level config that is worth sharing
+.idea/*
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+
+# Local LLM model files: multi-GB GGUF weights never belong in git
+*.gguf
+models/
