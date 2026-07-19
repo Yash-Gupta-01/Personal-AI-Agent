@@ -18,6 +18,12 @@ interface MemoryRepository {
     /** Active memories, newest first. Emits again whenever storage changes. */
     fun observeActive(): Flow<List<Memory>>
 
+    /**
+     * Up to [limit] active memories that have not been classified yet,
+     * oldest first so nothing captured early is starved by newer captures.
+     */
+    suspend fun unclassified(limit: Int): List<Memory>
+
     /** Inserts a new memory, or replaces an existing one with the same id. */
     suspend fun save(memory: Memory)
 

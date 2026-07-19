@@ -3,6 +3,7 @@ package com.aether.ui.dashboard
 import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryRepository
 import com.aether.domain.memory.MemorySource
+import com.aether.domain.memory.MemoryType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,10 @@ class DashboardViewModelTest {
 
     private val repository = object : MemoryRepository {
         override fun observeActive() = memories
+
+        override suspend fun unclassified(limit: Int): List<Memory> =
+            memories.value.filter { it.type == MemoryType.UNCLASSIFIED }.take(limit)
+
         override suspend fun save(memory: Memory) {
             memories.value = memories.value + memory
         }
