@@ -15,8 +15,29 @@ has to remember?*
 
 ## Status
 
-Milestone 1 — project skeleton. The app builds and launches; there is no
-memory, no LLM and no dashboard yet.
+**Milestone 2 — capture.** Aether is usable: capture a thought by voice or
+text, and it is stored as a structured memory and shown on the dashboard,
+grouped by day. Long-press a memory to delete it, with undo.
+
+There is no LLM yet. Every memory is captured as `UNCLASSIFIED`; classifying
+them is M3's job.
+
+## The capture loop
+
+```
+Voice ─┐
+       ├─► Transcript ─► Memory (UNCLASSIFIED) ─► Room ─► Dashboard
+Text ──┘
+```
+
+**You are never asked to categorise a thought.** Choosing a type, a title or
+tags at capture time is precisely the mental work Aether exists to remove, so
+capture asks for one thing — the thought — and classification is deferred to
+the memory agent.
+
+Provenance is recorded: text that came from speech is stored as
+`MANUAL_VOICE`, because transcripts carry recognition errors typed text does
+not, and later reasoning needs to know how much to trust the wording.
 
 ## Architecture
 
@@ -34,10 +55,10 @@ touching business logic.
 
 | Module | Type | Responsibility |
 |---|---|---|
-| `:domain` | pure JVM | Entities, ports, use cases. Memory, planner, journal and habit logic live here as packages. |
-| `:data` | Android library | Room database, repository implementations. |
-| `:llm` | Android library | On-device inference via llama.cpp. |
-| `:tools` | Android library | Tool registry and Android-API tools (alarms, reminders, notifications). |
+| `:domain` | pure JVM | `Memory`, the `MemoryRepository` port, day grouping. Planner, journal and habit logic will live here as packages. |
+| `:data` | Android library | Room database, `RoomMemoryRepository`. Schema JSON exported to `data/schemas` so migrations are reviewable as diffs. |
+| `:llm` | Android library | On-device inference via llama.cpp. Empty until M3. |
+| `:tools` | Android library | `SpeechToText`; later the tool registry and Android-API tools (alarms, reminders, notifications). |
 | `:app` | Android app | Compose UI, ViewModels, DI wiring. |
 
 **`:domain` applies no Android plugin.** This is the project's most important
@@ -89,6 +110,15 @@ adb devices                      # phone must show 'device', not 'offline'
 ./gradlew installDebug           # install on the connected phone
 ./gradlew connectedAndroidTest   # instrumented tests on real hardware
 ```
+
+Two traps worth knowing:
+
+- **`build` does not compile instrumented tests.** A broken `androidTest`
+  source compiles fine under `build` and only fails at
+  `connectedAndroidTest`. Run `assembleAndroidTest` if you want the check
+  without a device.
+- **`connectedAndroidTest` uninstalls the app afterwards**, wiping the
+  database. If you want the app left on the phone, run `installDebug` last.
 
 ## Versions
 
