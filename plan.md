@@ -125,8 +125,9 @@ hides every recogniser and `isRecognitionAvailable()` returns false on a device 
 action. The type appears on the card. First milestone where memory evolves on its own.
 
 - [x] 0 · `docs: add plan.md as the project's durable memory`
-- [ ] 1 · `feat(domain): memory classification prompt and parser`
-- [ ] 2 · `build(llm): llama.cpp native build via NDK`
+- [x] 1 · `feat(domain): memory classification prompt and parser` — 38 domain tests green
+- [x] 2 · `build(llm): llama.cpp native build via NDK` — submodule pinned to `b10068`,
+      NDK 28.2.13676358, `arm64-v8a` only, 3/3 native tests green on device
 - [ ] 3 · `feat(llm): JNI bindings and llama.cpp inference client`
 - [ ] 4 · `feat(llm): model download with progress` ← **confirm exact GGUF repo with user first**
 - [ ] 5 · `feat(data): unclassified query and schema v2 migration`
@@ -191,4 +192,19 @@ Hard-won; each of these cost real time.
   `installDebug` *last* if you want the app left on the phone.
 - **Room uses WAL** — inspecting the database means reading `aether.db-wal`, not just
   `aether.db`.
+- **Two native build settings silently cost inference speed.** Neither errors; both are
+  invisible unless `llama_print_system_info()` is read.
+  1. AGP compiles native code as `Debug` for the debug variant, building ggml's kernels
+     unoptimised — and debug is the variant actually installed and measured. Overridden to
+     `RelWithDebInfo` in `llm/build.gradle.kts`.
+  2. `GGML_NATIVE` must be off when cross-compiling, but with it off the ARM extensions must
+     be named explicitly via `GGML_CPU_ARM_ARCH`, or ggml falls back to plain NEON and loses
+     the int8 matmul kernels. Set to `armv8.2-a+dotprod+i8mm`.
+
+  `NativeLlamaTest` asserts `DOTPROD = 1` **and** `MATMUL_INT8 = 1` to catch a regression.
+  Its first version asserted `DOTPROD || MATMUL_INT8 || NEON` — and since NEON is always
+  present on arm64, it passed while both fast kernels were disabled. A test that cannot fail
+  for its own reason is worse than no test.
+- **The submodule must be initialised** before `:llm` builds: `git submodule update --init
+  --depth 1`. A plain `git clone` gives a confusing CMake failure on a new machine.
 - Never run the emulator: 4 cores and 16GB are shared with Android Studio.

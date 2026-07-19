@@ -1,11 +1,8 @@
 // Infrastructure layer: on-device inference via llama.cpp.
 //
-// Implements the LLM port declared in :domain, so the rest of the app never
-// knows which model or runtime is behind it.
-//
-// The NDK/CMake native build and the JNI bindings arrive in M2. The target
-// device (Snapdragon 7+ Gen 3, ARMv9 with i8mm and dotprod) means this will
-// be built arm64-v8a only — there is no reason to carry other ABIs.
+// Implements the LlmClient port declared in :domain, so the rest of the app
+// never knows which model or runtime is behind it. Nothing outside this module
+// may reference llama.cpp — that is what keeps a backend swap to one commit.
 plugins {
     alias(libs.plugins.android.library)
 }
@@ -16,6 +13,34 @@ android {
 
     defaultConfig {
         minSdk = 28
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            // arm64-v8a only. Every other ABI is dead weight in the APK and
+            // minutes of native compile time per build, and no target device
+            // needs them. The emulator is x86 and deliberately unsupported.
+            abiFilters += "arm64-v8a"
+        }
+
+        externalNativeBuild {
+            cmake {
+                // AGP compiles native code as Debug for the debug variant,
+                // which builds ggml's kernels unoptimised and makes inference
+                // several times slower. Since debug is the variant actually
+                // installed and measured on the phone, that would produce
+                // misleading benchmarks and invite blaming the model.
+                //
+                // RelWithDebInfo rather than Release: optimised, but keeps the
+                // symbols that make a native crash in the JNI layer readable.
+                arguments += "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     compileOptions {
@@ -26,4 +51,7 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }

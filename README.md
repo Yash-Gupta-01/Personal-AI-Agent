@@ -102,6 +102,15 @@ automatically on first open; it is gitignored.
 
 ## Build and run
 
+The inference engine is a git submodule, so a fresh clone needs it fetched
+before `:llm` will build:
+
+```bash
+git clone --recurse-submodules <url>
+# or, in an existing clone:
+git submodule update --init --depth 1
+```
+
 ```bash
 adb devices                      # phone must show 'device', not 'offline'
 
