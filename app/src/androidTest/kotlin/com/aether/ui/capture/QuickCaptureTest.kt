@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import com.aether.domain.memory.MemorySource
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -25,23 +26,25 @@ class QuickCaptureTest {
 
     @Test
     fun capturingTextInvokesCallbackWithTypedContent() {
-        val captured = mutableListOf<String>()
+        val captured = mutableListOf<Pair<String, MemorySource>>()
 
         composeTestRule.setContent {
-            QuickCaptureSheet(onDismiss = {}, onCapture = { captured += it })
+            QuickCaptureSheet(onDismiss = {}, onCapture = { text, source -> captured += text to source })
         }
 
         composeTestRule.onNodeWithTag(CaptureTestTags.TEXT_FIELD)
             .performTextInput("Renew the passport")
         composeTestRule.onNodeWithTag(CaptureTestTags.SAVE_BUTTON).performClick()
 
-        assertEquals(listOf("Renew the passport"), captured)
+        // Typed input must be recorded as typed: provenance drives how much
+        // the memory agent later trusts the wording.
+        assertEquals(listOf("Renew the passport" to MemorySource.MANUAL_TEXT), captured)
     }
 
     @Test
     fun saveIsDisabledUntilSomethingIsTyped() {
         composeTestRule.setContent {
-            QuickCaptureSheet(onDismiss = {}, onCapture = {})
+            QuickCaptureSheet(onDismiss = {}, onCapture = { _, _ -> })
         }
 
         // Prevents the empty-capture mis-tap at the UI layer, so the user is
@@ -58,7 +61,7 @@ class QuickCaptureTest {
         var dismissed = false
 
         composeTestRule.setContent {
-            QuickCaptureSheet(onDismiss = { dismissed = true }, onCapture = {})
+            QuickCaptureSheet(onDismiss = { dismissed = true }, onCapture = { _, _ -> })
         }
 
         composeTestRule.onNodeWithTag(CaptureTestTags.TEXT_FIELD).performTextInput("Done")
@@ -70,7 +73,7 @@ class QuickCaptureTest {
     @Test
     fun promptIsShownSoTheFieldIsNeverAmbiguous() {
         composeTestRule.setContent {
-            QuickCaptureSheet(onDismiss = {}, onCapture = {})
+            QuickCaptureSheet(onDismiss = {}, onCapture = { _, _ -> })
         }
 
         composeTestRule.onNodeWithText("What's on your mind?").assertIsDisplayed()

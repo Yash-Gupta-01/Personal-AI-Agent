@@ -3,17 +3,21 @@ package com.aether.ui.capture
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,10 +32,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.aether.domain.memory.MemorySource
 
 object CaptureTestTags {
     const val TEXT_FIELD = "capture_text_field"
     const val SAVE_BUTTON = "capture_save_button"
+    const val MIC_BUTTON = "capture_mic_button"
 }
 
 /**
@@ -48,19 +54,37 @@ object CaptureTestTags {
 @Composable
 internal fun QuickCaptureSheet(
     onDismiss: () -> Unit,
-    onCapture: (String) -> Unit,
+    onCapture: (String, MemorySource) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState()
     var text by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
     val focusRequester = remember { FocusRequester() }
+
+    // Provenance: once speech produced the text, the memory is a voice capture
+    // even if it was then edited by hand. Voice transcripts carry recognition
+    // errors that typed text does not, and the memory agent will need to know.
+    var usedVoice by remember { mutableStateOf(false) }
+
+    val voice = rememberVoiceCapture(
+        onTranscript = { transcript ->
+            text = transcript
+            usedVoice = true
+            error = null
+        },
+        onError = { error = it },
+    )
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     val canSave = text.isNotBlank()
     val save = {
         if (canSave) {
-            onCapture(text)
+            onCapture(
+                text,
+                if (usedVoice) MemorySource.MANUAL_VOICE else MemorySource.MANUAL_TEXT,
+            )
             onDismiss()
         }
     }
@@ -94,11 +118,42 @@ internal fun QuickCaptureSheet(
                 keyboardActions = KeyboardActions(onDone = { save() }),
             )
 
+            error?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Hidden entirely when no recogniser exists, rather than shown
+                // disabled: an affordance that can never work is just noise.
+                if (voice.isAvailable) {
+                    // A labelled button rather than a mic icon: the icon lives
+                    // only in material-icons-extended, which is thousands of
+                    // vectors of APK for one glyph, and the label is clearer.
+                    TextButton(
+                        onClick = voice.onToggle,
+                        modifier = Modifier.testTag(CaptureTestTags.MIC_BUTTON),
+                    ) {
+                        Text(
+                            text = if (voice.isListening) "Listening… tap to stop" else "Speak",
+                            color = if (voice.isListening) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.width(0.dp))
+                }
+
                 Button(
                     onClick = save,
                     enabled = canSave,
