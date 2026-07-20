@@ -100,6 +100,9 @@ Newest last. Each row is a decision that would otherwise have to be re-derived.
 | 2026-07-19 | **Repo-local git identity** (`Yash Gupta <guptayash112003@gmail.com>`) | This is a personal project; the global identity is a work account. Set at repo scope only, so other repositories are unaffected. Commits before this date carry the work email. |
 | 2026-07-20 | **Model: LFM2.5-1.2B-Instruct `Q4_K_M`** (697MB, `LiquidAI/LFM2.5-1.2B-Instruct-GGUF`) | Verified against pinned llama.cpp before choosing: `LLM_ARCH_LFM2` supported, ChatML-like template so llama.cpp's heuristic detector recognises it, and no thinking mode — which matters because an 8-token budget would otherwise return an unterminated `<think>` block. Hybrid conv design targets fast prefill, and prefill is our real cost since classification generates ~8 tokens. Licence is LFM1.0 (not OSI); Qwen3.5-0.8B (Apache-2.0, 507MB) is the known-good fallback. |
 | 2026-07-20 | **Model lives in internal storage**, staged via external | Aether's premise is that nothing leaves the device, and `/sdcard/Android/data/<pkg>` is reachable over adb and by some file managers. DownloadManager cannot write to internal storage, so it stages to external and `promoteStagedModel()` copies it in once. |
+| 2026-07-20 | **`classification_attempts` lives on the Room entity only, never on domain `Memory`** | It is retry bookkeeping, not something Aether knows about the user. The only reader is the queue query. The domain expresses it as intent instead — `MemoryRepository.recordClassificationFailure(id)` — so no other layer learns a counter exists. |
+| 2026-07-20 | **Attempt count resets when a memory is edited** | Falls out of `REPLACE` upsert defaulting the column, and is the behaviour you want anyway: the model failed on text that no longer exists. |
+| 2026-07-20 | **Schema v2 via Room `@AutoMigration`, not hand-written SQL** | Adding a column with a default is exactly the case Room infers correctly. A hand-written migration here would be code to review and get wrong for no gain. |
 | 2026-07-19 | **Never ask a small model for JSON** | 1.5B models emit malformed JSON often enough to be a real failure source. Classification asks for one word from a closed set and validates against the enum, falling back to `UNCLASSIFIED`. Robust by construction, not by prompt-begging. |
 
 ---
@@ -134,7 +137,8 @@ action. The type appears on the card. First milestone where memory evolves on it
       tests skip cleanly until a GGUF is present
 - [x] 4 · `feat(llm): model download with progress` — LFM2.5 downloaded and classifying
       correctly on device; `chat_template=present`, 3 inference tests green
-- [ ] 5 · `feat(data): unclassified query and schema v2 migration`
+- [x] 5 · `feat(data): unclassified query and schema v2 migration` — 41 domain tests, 8 DAO
+      tests green; v1→v2 auto-migration verified against the phone's real database
 - [ ] 6 · `feat(app): background classification with type on cards` ← the payoff
 - [ ] 7 · `docs: update README and plan.md`
 
@@ -143,7 +147,9 @@ Commits 1–3 and 5 produce nothing visible. That is the honest shape of this mi
 **Model:** Qwen 1.5B–3B class, `Q4_K_M`. Exact repo to be chosen before commit 4.
 
 **Schema v2** adds `classification_attempts`, so a memory the model repeatedly fails on stops
-being retried instead of draining battery forever.
+being retried instead of draining battery forever. The queue is oldest-first, so without the
+cap a single unlabellable memory would sit at its head and block every capture behind it —
+this is a liveness fix, not just a battery one. Cap is 3 (`ClassifyMemories.MAX_ATTEMPTS`).
 
 **Escape hatch:** if NDK/JNI stalls, the `LlmClient` port means switching to LiteRT-LM costs
 one commit. This is deliberate and should be used rather than sunk-cost-ed.

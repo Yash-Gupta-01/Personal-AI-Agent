@@ -1,5 +1,6 @@
 package com.aether.data.memory
 
+import com.aether.domain.memory.ClassifyMemories
 import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryRepository
 import com.aether.domain.memory.MemoryStatus
@@ -28,8 +29,12 @@ internal class RoomMemoryRepository @Inject constructor(
         dao.unclassified(
             status = MemoryStatus.ACTIVE.name,
             unclassified = MemoryType.UNCLASSIFIED.name,
+            maxAttempts = ClassifyMemories.MAX_ATTEMPTS,
             limit = limit,
         ).map { it.toDomain() }
+
+    override suspend fun recordClassificationFailure(id: String) =
+        dao.incrementClassificationAttempts(id)
 
     override suspend fun save(memory: Memory) = dao.upsert(memory.toEntity())
 

@@ -21,8 +21,21 @@ interface MemoryRepository {
     /**
      * Up to [limit] active memories that have not been classified yet,
      * oldest first so nothing captured early is starved by newer captures.
+     *
+     * Memories the model has already failed on [ClassifyMemories.MAX_ATTEMPTS]
+     * times are excluded — without that, one memory no model can label sits at
+     * the head of an oldest-first queue forever and blocks everything behind it.
      */
     suspend fun unclassified(limit: Int): List<Memory>
+
+    /**
+     * Records that classification was attempted on [id] and produced nothing
+     * usable, so it eventually drops out of [unclassified].
+     *
+     * Separate from [save] because it must not touch `updatedAt` — a failed
+     * attempt is not a change to what Aether knows.
+     */
+    suspend fun recordClassificationFailure(id: String)
 
     /** Inserts a new memory, or replaces an existing one with the same id. */
     suspend fun save(memory: Memory)

@@ -34,6 +34,8 @@ class ClassifyMemories(
             if (type != MemoryType.UNCLASSIFIED) {
                 repository.save(memory.withType(type))
                 classified++
+            } else {
+                repository.recordClassificationFailure(memory.id)
             }
         }
         return classified
@@ -58,9 +60,16 @@ class ClassifyMemories(
         null
     }
 
-    private companion object {
+    companion object {
         // Small batches keep any single background run short, so classification
         // never holds the device awake for long.
-        const val DEFAULT_BATCH = 10
+        private const val DEFAULT_BATCH = 10
+
+        /**
+         * How many unusable answers a memory tolerates before it stops being
+         * retried. Three, because the model is sampled — a second and third
+         * look genuinely differ — but a fourth is just battery.
+         */
+        const val MAX_ATTEMPTS = 3
     }
 }

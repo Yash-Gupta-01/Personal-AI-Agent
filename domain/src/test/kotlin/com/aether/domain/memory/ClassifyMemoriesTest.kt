@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
@@ -23,17 +24,24 @@ class ClassifyMemoriesTest {
     private class FakeRepository(initial: List<Memory> = emptyList()) : MemoryRepository {
         val stored: MutableMap<String, Memory> =
             initial.associateBy { it.id }.toMutableMap()
+        val attempts: MutableMap<String, Int> = mutableMapOf()
 
         override fun observeActive(): Flow<List<Memory>> = flowOf(stored.values.toList())
 
         override suspend fun unclassified(limit: Int): List<Memory> =
             stored.values
                 .filter { it.type == MemoryType.UNCLASSIFIED }
+                .filter { (attempts[it.id] ?: 0) < ClassifyMemories.MAX_ATTEMPTS }
                 .sortedBy { it.createdAt }
                 .take(limit)
 
+        override suspend fun recordClassificationFailure(id: String) {
+            attempts[id] = (attempts[id] ?: 0) + 1
+        }
+
         override suspend fun save(memory: Memory) {
             stored[memory.id] = memory
+            attempts.remove(memory.id)
         }
 
         override suspend fun delete(id: String) {
@@ -82,6 +90,28 @@ class ClassifyMemoriesTest {
         // Still in the queue, still unlabelled — better than a confident guess.
         assertEquals(0, count)
         assertEquals(MemoryType.UNCLASSIFIED, repository.stored.values.single().type)
+        assertEquals(1, repository.attempts.values.single())
+    }
+
+    @Test
+    fun `a memory the model keeps failing on leaves the queue`() = runTest {
+        val repository = FakeRepository(listOf(memory("Untypeable")))
+        val nonsense = object : LlmClient {
+            var calls = 0
+            override suspend fun generate(prompt: String, maxTokens: Int): String {
+                calls++
+                return "banana"
+            }
+        }
+
+        repeat(ClassifyMemories.MAX_ATTEMPTS + 2) {
+            ClassifyMemories(repository, nonsense).invoke()
+        }
+
+        // Without the attempt cap this memory sits at the head of an
+        // oldest-first queue forever, blocking every capture behind it.
+        assertEquals(ClassifyMemories.MAX_ATTEMPTS, nonsense.calls)
+        assertTrue(repository.unclassified(10).isEmpty())
     }
 
     @Test

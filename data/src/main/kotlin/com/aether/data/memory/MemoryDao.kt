@@ -19,16 +19,30 @@ internal interface MemoryDao {
     fun observeByStatus(status: String): Flow<List<MemoryEntity>>
 
     /**
-     * The classification queue: active memories with no type yet.
+     * The classification queue: active memories with no type yet that the
+     * model has not already failed on [maxAttempts] times.
      *
      * Oldest first, so an early capture is never starved by newer ones. Not a
      * Flow — this is pulled by a background worker, not observed by the UI.
      */
     @Query(
         "SELECT * FROM memories WHERE status = :status AND type = :unclassified " +
+            "AND classification_attempts < :maxAttempts " +
             "ORDER BY created_at ASC LIMIT :limit",
     )
-    suspend fun unclassified(status: String, unclassified: String, limit: Int): List<MemoryEntity>
+    suspend fun unclassified(
+        status: String,
+        unclassified: String,
+        maxAttempts: Int,
+        limit: Int,
+    ): List<MemoryEntity>
+
+    /** Increments in SQL rather than read-modify-write, so it cannot race. */
+    @Query(
+        "UPDATE memories SET classification_attempts = classification_attempts + 1 " +
+            "WHERE id = :id",
+    )
+    suspend fun incrementClassificationAttempts(id: String)
 
     /** REPLACE so that saving an edited memory updates the existing row. */
     @Insert(onConflict = OnConflictStrategy.REPLACE)

@@ -39,4 +39,16 @@ data class MemoryEntity(
 
     @ColumnInfo(name = "updated_at")
     val updatedAtEpochMillis: Long,
+
+    /**
+     * How many times classification has run on this memory and produced
+     * nothing usable. Storage-only bookkeeping — the domain [Memory] has no
+     * such field because nothing outside the retry query reads it.
+     *
+     * Defaulted so the mappers never have to mention it: an upsert of an
+     * edited memory resets the count, which is what you want, since the
+     * content the model failed on is no longer the content it will see.
+     */
+    @ColumnInfo(name = "classification_attempts", defaultValue = "0")
+    val classificationAttempts: Int = 0,
 )

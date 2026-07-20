@@ -1,5 +1,6 @@
 package com.aether.data
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.aether.data.memory.MemoryDao
@@ -10,12 +11,18 @@ import com.aether.data.memory.MemoryEntity
  * source of truth, not a cache of something remote.
  *
  * Schema JSON is exported to `data/schemas` so migrations can be reviewed as
- * diffs. There are no migrations yet — version 1 is the first schema.
+ * diffs.
+ *
+ * v2 adds `classification_attempts`. Hand-written migrations are worth the
+ * effort only where Room cannot infer the change; adding a column with a
+ * default is precisely the case it can, so the migration is declared and Room
+ * generates the SQL.
  */
 @Database(
     entities = [MemoryEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 internal abstract class AetherDatabase : RoomDatabase() {
     abstract fun memoryDao(): MemoryDao

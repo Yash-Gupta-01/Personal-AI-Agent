@@ -4,9 +4,11 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aether.data.AetherDatabase
+import com.aether.domain.memory.ClassifyMemories
 import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemorySource
 import com.aether.domain.memory.MemoryStatus
+import com.aether.domain.memory.MemoryType
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -91,6 +93,48 @@ class MemoryDaoTest {
         repository.delete(memory.id)
 
         assertTrue(repository.observeActive().first().isEmpty())
+    }
+
+    @Test
+    fun unclassifiedReturnsOldestFirstAndSkipsTypedMemories() = runTest {
+        val older = Memory.capture("Older", MemorySource.MANUAL_TEXT, now)
+        val newer = Memory.capture("Newer", MemorySource.MANUAL_TEXT, now.plusSeconds(60))
+        val typed = Memory.capture("Typed", MemorySource.MANUAL_TEXT, now)
+            .withType(MemoryType.GOAL, now)
+        listOf(older, newer, typed).forEach { repository.save(it) }
+
+        val queue = repository.unclassified(limit = 10).map { it.content }
+
+        assertEquals(listOf("Older", "Newer"), queue)
+    }
+
+    @Test
+    fun repeatedlyFailedMemoryDropsOutOfTheQueue() = runTest {
+        val memory = Memory.capture("Untypeable", MemorySource.MANUAL_TEXT, now)
+        repository.save(memory)
+
+        repeat(ClassifyMemories.MAX_ATTEMPTS - 1) {
+            repository.recordClassificationFailure(memory.id)
+        }
+        assertEquals(1, repository.unclassified(limit = 10).size)
+
+        repository.recordClassificationFailure(memory.id)
+
+        assertTrue(repository.unclassified(limit = 10).isEmpty())
+        // ...but it is still a memory, just an unlabelled one.
+        assertEquals(1, repository.observeActive().first().size)
+    }
+
+    @Test
+    fun editingAMemoryGivesClassificationAnotherChance() = runTest {
+        val memory = Memory.capture("Untypeable", MemorySource.MANUAL_TEXT, now)
+        repository.save(memory)
+        repeat(ClassifyMemories.MAX_ATTEMPTS) { repository.recordClassificationFailure(memory.id) }
+
+        repository.save(memory.withContent("Now says something classifiable", now.plusSeconds(5)))
+
+        // The model failed on text that no longer exists, so the count is stale.
+        assertEquals(1, repository.unclassified(limit = 10).size)
     }
 
     @Test
