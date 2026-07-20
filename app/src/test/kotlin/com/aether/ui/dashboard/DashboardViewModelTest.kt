@@ -1,5 +1,7 @@
 package com.aether.ui.dashboard
 
+import com.aether.domain.llm.LlmClient
+import com.aether.domain.memory.ClassifyMemories
 import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryRepository
 import com.aether.domain.memory.MemorySource
@@ -38,14 +40,27 @@ class DashboardViewModelTest {
         override suspend fun unclassified(limit: Int): List<Memory> =
             memories.value.filter { it.type == MemoryType.UNCLASSIFIED }.take(limit)
 
+        override suspend fun recordClassificationFailure(id: String) = Unit
+
         override suspend fun save(memory: Memory) {
-            memories.value = memories.value + memory
+            memories.value = memories.value.filterNot { it.id == memory.id } + memory
         }
 
         override suspend fun delete(id: String) {
             memories.value = memories.value.filterNot { it.id == id }
         }
     }
+
+    /** Answers with one type, then stops classifying anything. */
+    private var llmAnswers = ArrayDeque<String>()
+
+    private val llmClient = object : LlmClient {
+        override suspend fun generate(prompt: String, maxTokens: Int): String =
+            llmAnswers.removeFirstOrNull() ?: "UNCLASSIFIED"
+    }
+
+    private fun viewModel() =
+        DashboardViewModel(repository, ClassifyMemories(repository, llmClient))
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -55,7 +70,7 @@ class DashboardViewModelTest {
 
     @Test
     fun `starts empty`() = runTest {
-        val viewModel = DashboardViewModel(repository)
+        val viewModel = viewModel()
 
         assertTrue(viewModel.uiState.value.isEmpty)
     }
@@ -65,7 +80,7 @@ class DashboardViewModelTest {
         val now = Instant.parse("2026-07-19T09:00:00Z")
         memories.value = listOf(Memory.capture("Water the plants", MemorySource.MANUAL_TEXT, now))
 
-        val viewModel = DashboardViewModel(repository)
+        val viewModel = viewModel()
         val state = viewModel.uiState.first { !it.isEmpty }
 
         assertFalse(state.isEmpty)
@@ -79,7 +94,7 @@ class DashboardViewModelTest {
             Memory.capture("Friday", MemorySource.MANUAL_TEXT, Instant.parse("2026-07-17T09:00:00Z")),
         )
 
-        val viewModel = DashboardViewModel(repository)
+        val viewModel = viewModel()
         val state = viewModel.uiState.first { it.days.size == 2 }
 
         assertEquals(2, state.days.size)
@@ -87,7 +102,7 @@ class DashboardViewModelTest {
 
     @Test
     fun `capture stores the typed content`() = runTest {
-        val viewModel = DashboardViewModel(repository)
+        val viewModel = viewModel()
 
         viewModel.capture("Renew the passport")
 
@@ -98,7 +113,7 @@ class DashboardViewModelTest {
 
     @Test
     fun `blank captures are ignored`() = runTest {
-        val viewModel = DashboardViewModel(repository)
+        val viewModel = viewModel()
 
         viewModel.capture("   ")
 
@@ -109,7 +124,7 @@ class DashboardViewModelTest {
 
     @Test
     fun `delete removes the memory`() = runTest {
-        val viewModel = DashboardViewModel(repository)
+        val viewModel = viewModel()
         viewModel.capture("Mistake")
         val stored = viewModel.uiState.first { !it.isEmpty }.days.single().memories.single()
 
@@ -120,7 +135,7 @@ class DashboardViewModelTest {
 
     @Test
     fun `restore brings back the memory unchanged`() = runTest {
-        val viewModel = DashboardViewModel(repository)
+        val viewModel = viewModel()
         viewModel.capture("Worth keeping after all")
         val original = viewModel.uiState.first { !it.isEmpty }.days.single().memories.single()
         viewModel.delete(original)
@@ -138,8 +153,39 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun `classifies a captured memory without being asked`() = runTest {
+        llmAnswers = ArrayDeque(listOf("HEALTH"))
+        val viewModel = viewModel()
+
+        viewModel.capture("Stop skipping breakfast")
+
+        // The whole point of the milestone: the user does nothing, and the
+        // memory acquires a type on its own.
+        val classified = viewModel.uiState
+            .first { it.days.singleOrNull()?.memories?.singleOrNull()?.type == MemoryType.HEALTH }
+        assertEquals(
+            MemoryType.HEALTH,
+            classified.days.single().memories.single().type,
+        )
+    }
+
+    @Test
+    fun `classifies the backlog left over from a previous session`() = runTest {
+        llmAnswers = ArrayDeque(listOf("GOAL"))
+        memories.value = listOf(
+            Memory.capture("Run a half marathon", MemorySource.MANUAL_TEXT, Instant.parse("2026-07-18T09:00:00Z")),
+        )
+
+        val viewModel = viewModel()
+
+        val state = viewModel.uiState
+            .first { it.days.singleOrNull()?.memories?.singleOrNull()?.type == MemoryType.GOAL }
+        assertEquals(MemoryType.GOAL, state.days.single().memories.single().type)
+    }
+
+    @Test
     fun `updates when a memory is captured`() = runTest {
-        val viewModel = DashboardViewModel(repository)
+        val viewModel = viewModel()
         assertTrue(viewModel.uiState.value.isEmpty)
 
         // A capture must reach the dashboard without an explicit refresh.

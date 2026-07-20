@@ -103,6 +103,11 @@ Newest last. Each row is a decision that would otherwise have to be re-derived.
 | 2026-07-20 | **`classification_attempts` lives on the Room entity only, never on domain `Memory`** | It is retry bookkeeping, not something Aether knows about the user. The only reader is the queue query. The domain expresses it as intent instead — `MemoryRepository.recordClassificationFailure(id)` — so no other layer learns a counter exists. |
 | 2026-07-20 | **Attempt count resets when a memory is edited** | Falls out of `REPLACE` upsert defaulting the column, and is the behaviour you want anyway: the model failed on text that no longer exists. |
 | 2026-07-20 | **Schema v2 via Room `@AutoMigration`, not hand-written SQL** | Adding a column with a default is exactly the case Room infers correctly. A hand-written migration here would be code to review and get wrong for no gain. |
+| 2026-07-21 | **Prompt is a template with `{placeholders}`, substituted after `trimIndent()`** | `"""...$labels...""".trimIndent()` silently does nothing: interpolation runs first, so the injected block's unindented lines make the common indent zero and every other line keeps its 12 spaces. The model read that as noise and answered with whichever label was listed first — classification was 2/9 and looked like the model being incapable. A test now asserts no prompt line is indented. |
+| 2026-07-21 | **Label words chosen for the model, not the schema**: `RELATIONSHIP`→`PERSON`, `KNOWLEDGE`→`FACT` | A 1.2B model matches on ordinary words. "My sister is moving" reads as PERSON far more readily than RELATIONSHIP. Free to do — a memory's type is persisted by name, and unknown names already degrade to `UNCLASSIFIED` rather than crashing. |
+| 2026-07-21 | **`MemoryType` declaration order is the model's decision order** | The prompt turns the enum into numbered first-match-wins tie-break rules, with the last entry generated as the explicit fallback. Without them each label list had a catch-all that swallowed everything unsure — GOAL, then PROJECT, then REFLECTION in turn. Deriving rules from `description` means adding a type cannot leave the rules stale, but it also makes reordering a behaviour change, not a cosmetic one. |
+| 2026-07-21 | **Classification quality is measured against a fixed 9-note set on device** (`ClassificationAccuracyTest`) | "Produces a label" passes with a completely broken prompt — it just produces the *same* label. Only a fixed set with known answers catches that, and only it shows that a prompt change traded one category's accuracy for another's. Measured: bare labels 4/9 → +descriptions 4/9 → +one example each 5/9 → +decision order 6/9 → +tightened descriptions **7/9**, bit-identical run to run. |
+| 2026-07-21 | **No WorkManager; classification runs in the dashboard's ViewModel scope** | The queue is durable in SQLite, so abandoning a pass mid-inference costs nothing but a retry on next launch. WorkManager earns its dependency when something must act on memories while the app is closed — a reminder or a nudge — which is M4+ work. |
 | 2026-07-19 | **Never ask a small model for JSON** | 1.5B models emit malformed JSON often enough to be a real failure source. Classification asks for one word from a closed set and validates against the enum, falling back to `UNCLASSIFIED`. Robust by construction, not by prompt-begging. |
 
 ---
@@ -139,7 +144,8 @@ action. The type appears on the card. First milestone where memory evolves on it
       correctly on device; `chat_template=present`, 3 inference tests green
 - [x] 5 · `feat(data): unclassified query and schema v2 migration` — 41 domain tests, 8 DAO
       tests green; v1→v2 auto-migration verified against the phone's real database
-- [ ] 6 · `feat(app): background classification with type on cards` ← the payoff
+- [x] 6 · `feat(app): background classification with type on cards` — the payoff. Verified on
+      hardware: captured by voice/text, labelled with no user action, label on the card.
 - [ ] 7 · `docs: update README and plan.md`
 
 Commits 1–3 and 5 produce nothing visible. That is the honest shape of this milestone.
@@ -177,6 +183,8 @@ Per principle 5, M4 should be **retrieval**, not a bigger model.
 | TurboQuant | It merges upstream **and** context regularly exceeds ~32K. Both conditions, not either. |
 | Ktor | A networked tool exists. The model download uses Android's `DownloadManager`. |
 | In-app model picker | More than one model is genuinely in use. |
+| Re-classifying already-labelled memories | The prompt improves *and* enough memories carry a label from an older prompt to be worth a pass. Improvements only reach `UNCLASSIFIED` memories, so today's wrong labels stay wrong. Cheap when wanted: one UPDATE back to `UNCLASSIFIED`. |
+| Better classification than 7/9 | The two remaining misses justify the cost. Next levers, in order: few-shot as real chat turns rather than one flat user turn (needs a JNI change), then a 3B-class model (~2GB, 2–3× slower per note). |
 
 ---
 
@@ -200,6 +208,9 @@ Hard-won; each of these cost real time.
   `build assembleAndroidTest`.
 - **`connectedAndroidTest` uninstalls the app afterwards**, wiping the database. Run
   `installDebug` *last* if you want the app left on the phone.
+- **`adb shell cat` corrupts binary files** — it translates line endings, so a pulled database
+  fails to open with "disk image is malformed", pointing at the database rather than the copy.
+  Use `adb exec-out` for any binary, and pull `aether.db-wal` alongside `aether.db`.
 - **Room uses WAL** — inspecting the database means reading `aether.db-wal`, not just
   `aether.db`.
 - **Two native build settings silently cost inference speed.** Neither errors; both are

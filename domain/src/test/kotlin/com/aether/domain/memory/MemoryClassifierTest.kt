@@ -32,6 +32,19 @@ class MemoryClassifierTest {
     }
 
     @Test
+    fun `prompt has no stray indentation`() {
+        val prompt = MemoryClassifier.buildPrompt("Call the dentist")
+
+        // trimIndent() silently does nothing when an interpolated block
+        // contributes unindented lines, leaving a prompt where half the lines
+        // carry twelve leading spaces. The model reads that as noise and falls
+        // back to the first category listed, which is a failure that looks
+        // exactly like the model being incapable.
+        val indented = prompt.lines().filter { it != it.trimStart() }
+        assertTrue("prompt lines are indented: $indented", indented.isEmpty())
+    }
+
+    @Test
     fun `exact label parses`() {
         assertEquals(MemoryType.HABIT, MemoryClassifier.parse("HABIT"))
     }
@@ -54,14 +67,14 @@ class MemoryClassifierTest {
     @Test
     fun `echoed prompt prefix is stripped`() {
         // Small models frequently repeat the prompt's last line before answering.
-        assertEquals(MemoryType.PROJECT, MemoryClassifier.parse("Category: PROJECT"))
+        assertEquals(MemoryType.PROJECT, MemoryClassifier.parse("Label: PROJECT"))
     }
 
     @Test
     fun `label buried in a sentence is found`() {
         assertEquals(
-            MemoryType.RELATIONSHIP,
-            MemoryClassifier.parse("The best fit here is RELATIONSHIP"),
+            MemoryType.PERSON,
+            MemoryClassifier.parse("The best fit here is PERSON"),
         )
     }
 
@@ -100,8 +113,8 @@ class MemoryClassifierTest {
     fun `first word wins when the model answers then rambles`() {
         // The common well-behaved-but-chatty case: correct answer, then noise.
         assertEquals(
-            MemoryType.KNOWLEDGE,
-            MemoryClassifier.parse("KNOWLEDGE because it records a fact"),
+            MemoryType.FACT,
+            MemoryClassifier.parse("FACT because it records a fact"),
         )
     }
 

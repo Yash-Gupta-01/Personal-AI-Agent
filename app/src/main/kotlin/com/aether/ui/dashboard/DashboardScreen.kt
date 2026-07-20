@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryDay
 import com.aether.domain.memory.MemorySource
+import com.aether.domain.memory.MemoryType
 import com.aether.ui.theme.AetherTheme
 import java.time.Instant
 import java.time.LocalDate
@@ -119,12 +122,24 @@ private fun MemoryCard(
                     text = memory.content,
                     style = MaterialTheme.typography.bodyLarge,
                 )
-                Text(
-                    text = memory.createdAt.toTimeLabel(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(
                     modifier = Modifier.padding(top = 8.dp),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = memory.createdAt.toTimeLabel(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // Nothing is shown while a memory is unclassified. A
+                    // "pending" chip would advertise machinery the user did
+                    // not ask for and cannot act on; the type appearing on its
+                    // own is the whole point.
+                    if (memory.type != MemoryType.UNCLASSIFIED) {
+                        TypeLabel(type = memory.type)
+                    }
+                }
             }
         }
 
@@ -141,6 +156,28 @@ private fun MemoryCard(
                 },
             )
         }
+    }
+}
+
+/**
+ * The type a memory was classified as.
+ *
+ * Text, not an icon: nine types have no icon set anyone would read correctly,
+ * and a wrong-looking glyph is harder to ignore than a word. Not a chip
+ * either — chips look tappable, and this is a statement, not an action.
+ */
+@Composable
+private fun TypeLabel(type: MemoryType, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+    ) {
+        Text(
+            text = type.name.lowercase().replaceFirstChar(Char::uppercase),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 }
 
@@ -187,7 +224,8 @@ private fun DashboardContentPreview() {
                         date = LocalDate.of(2026, 7, 19),
                         memories = listOf(
                             Memory.capture("Ask about the lease renewal", MemorySource.MANUAL_TEXT, now),
-                            Memory.capture("Prefers morning workouts", MemorySource.MANUAL_VOICE, now),
+                            Memory.capture("Prefers morning workouts", MemorySource.MANUAL_VOICE, now)
+                                .withType(MemoryType.PREFERENCE, now),
                         ),
                     ),
                 ),

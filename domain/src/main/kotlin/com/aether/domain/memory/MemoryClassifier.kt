@@ -28,36 +28,68 @@ object MemoryClassifier {
     private val selectableTypes: List<MemoryType> =
         MemoryType.entries.filterNot { it == MemoryType.UNCLASSIFIED }
 
-    fun buildPrompt(content: String): String {
-        val labels = selectableTypes.joinToString("\n") { "- ${it.name}" }
-        return """
-            Classify the note into exactly one category.
+    /**
+     * The template is trimmed *before* the labels and note are substituted.
+     *
+     * `"""...$labels...""".trimIndent()` looks equivalent and is not:
+     * interpolation happens first, so the injected block's unindented lines
+     * make the common indent zero and every other line keeps its source
+     * indentation. The model then reads a prompt where half the lines are
+     * indented twelve spaces and half are not — which reliably degraded the
+     * answer to whichever category was listed first.
+     */
+    private val TEMPLATE: String = """
+        Classify the note into exactly one label.
+        Choose the label that best matches the main meaning of the note.
 
-            Categories:
-            $labels
+        Labels:
+        {labels}
 
-            Rules:
-            - Reply with the category name only.
-            - No explanation, no punctuation, no extra words.
+        Decision order — use the first rule that fits:
+        {rules}
 
-            Note: ${content.trim()}
+        Examples:
+        {examples}
 
-            Category:
-        """.trimIndent()
-    }
+        Rules:
+        - Reply with the label name only.
+        - No explanation, no punctuation, no extra words.
+
+        Note: {note}
+        Label:
+    """.trimIndent()
+
+    fun buildPrompt(content: String): String =
+        TEMPLATE
+            .replace(
+                "{labels}",
+                selectableTypes.joinToString("\n") { "- ${it.name}: ${it.description}" },
+            )
+            .replace(
+                "{rules}",
+                selectableTypes.withIndex().joinToString("\n") { (i, type) ->
+                    "${i + 1}. If the note is about ${type.description}, choose ${type.name}."
+                },
+            )
+            .replace(
+                "{examples}",
+                selectableTypes.joinToString("\n") { "Note: ${it.example}\nLabel: ${it.name}" },
+            )
+            // Substituted last, so a note containing "{labels}" cannot inject.
+            .replace("{note}", content.trim())
 
     /**
      * Reads a [MemoryType] out of the model's raw output.
      *
      * Tolerant of the ways a small model deviates while still being right —
      * lowercase, surrounding whitespace, a trailing full stop, a leading
-     * "Category:", or a short preamble before the label. Genuinely unrecognised
+     * "Label:", or a short preamble before the label. Genuinely unrecognised
      * output becomes [MemoryType.UNCLASSIFIED], which leaves the memory in the
      * queue rather than mislabelling it.
      */
     fun parse(rawOutput: String): MemoryType {
         val normalised = rawOutput
-            .substringAfter("Category:", rawOutput)
+            .substringAfterLast("Label:", rawOutput)
             .uppercase()
             .replace(NON_LETTER, " ")
             .trim()

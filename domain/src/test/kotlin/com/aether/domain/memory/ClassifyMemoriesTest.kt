@@ -119,7 +119,7 @@ class ClassifyMemoriesTest {
         val original = memory("Exact wording matters")
         val repository = FakeRepository(listOf(original))
 
-        ClassifyMemories(repository, llmReturning("KNOWLEDGE")).invoke()
+        ClassifyMemories(repository, llmReturning("FACT")).invoke()
 
         val stored = repository.stored.values.single()
         assertEquals(original.content, stored.content)

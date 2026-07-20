@@ -2,6 +2,7 @@ package com.aether.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aether.domain.memory.ClassifyMemories
 import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryDay
 import com.aether.domain.memory.MemoryRepository
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import javax.inject.Inject
 
 /**
@@ -32,7 +34,21 @@ data class DashboardUiState(
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val repository: MemoryRepository,
+    private val classifyMemories: ClassifyMemories,
 ) : ViewModel() {
+
+    // Guards against several passes running at once. They would not corrupt
+    // anything — inference is serialised inside the client — but each capture
+    // would queue another full batch behind the running one, so a burst of
+    // captures would do the same work many times over.
+    private val classifying = Mutex()
+
+    init {
+        // Clears whatever accumulated while the app was closed. Classification
+        // has no UI of its own: the type simply appears on the card, because
+        // saving a classified memory makes Room re-emit the dashboard's flow.
+        classifyInBackground()
+    }
 
     val uiState: StateFlow<DashboardUiState> =
         repository.observeActive()
@@ -53,6 +69,30 @@ class DashboardViewModel @Inject constructor(
         if (content.isBlank()) return
         viewModelScope.launch {
             repository.save(Memory.capture(content, source))
+            classifyInBackground()
+        }
+    }
+
+    /**
+     * Classifies whatever is pending, if a pass is not already running.
+     *
+     * Scoped to the ViewModel, so leaving the app mid-inference abandons the
+     * pass. That is safe rather than lossy: the queue lives in SQLite, so the
+     * next launch picks up exactly where this left off.
+     *
+     * ponytail: no WorkManager. Classification needs the app open, which is
+     * fine while the only consumer of a type is a card the user is looking at.
+     * Add one when something acts on memories while the app is closed — a
+     * reminder, a proactive nudge — not before.
+     */
+    private fun classifyInBackground() {
+        if (!classifying.tryLock()) return
+        viewModelScope.launch {
+            try {
+                classifyMemories.invoke()
+            } finally {
+                classifying.unlock()
+            }
         }
     }
 
