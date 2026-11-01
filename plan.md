@@ -106,7 +106,9 @@ Newest last. Each row is a decision that would otherwise have to be re-derived.
 | 2026-07-21 | **Prompt is a template with `{placeholders}`, substituted after `trimIndent()`** | `"""...$labels...""".trimIndent()` silently does nothing: interpolation runs first, so the injected block's unindented lines make the common indent zero and every other line keeps its 12 spaces. The model read that as noise and answered with whichever label was listed first — classification was 2/9 and looked like the model being incapable. A test now asserts no prompt line is indented. |
 | 2026-07-21 | **Label words chosen for the model, not the schema**: `RELATIONSHIP`→`PERSON`, `KNOWLEDGE`→`FACT` | A 1.2B model matches on ordinary words. "My sister is moving" reads as PERSON far more readily than RELATIONSHIP. Free to do — a memory's type is persisted by name, and unknown names already degrade to `UNCLASSIFIED` rather than crashing. |
 | 2026-07-21 | **`MemoryType` declaration order is the model's decision order** | The prompt turns the enum into numbered first-match-wins tie-break rules, with the last entry generated as the explicit fallback. Without them each label list had a catch-all that swallowed everything unsure — GOAL, then PROJECT, then REFLECTION in turn. Deriving rules from `description` means adding a type cannot leave the rules stale, but it also makes reordering a behaviour change, not a cosmetic one. |
-| 2026-07-21 | **Classification quality is measured against a fixed 9-note set on device** (`ClassificationAccuracyTest`) | "Produces a label" passes with a completely broken prompt — it just produces the *same* label. Only a fixed set with known answers catches that, and only it shows that a prompt change traded one category's accuracy for another's. Measured: bare labels 4/9 → +descriptions 4/9 → +one example each 5/9 → +decision order 6/9 → +tightened descriptions **7/9**, bit-identical run to run. |
+| 2026-07-21 | **Classification quality is measured against a fixed 54-note set on device** (`ClassificationAccuracyTest`), six per type | "Produces a label" passes with a completely broken prompt — it just produces the *same* label. The first version of this used 9 notes and was worthless: it scored the current prompt 7/9, and the same prompt scores **26/54 (48%)** on the larger set. At n=9 one sample is 11 points, so every prompt conclusion drawn from it was noise. Six per type on purpose — an unbalanced set rewards a prompt that just favours the commonest label, which is the exact failure being hunted. |
+| 2026-07-21 | **Prompt wording is exhausted as a lever; the remaining fixes are structural** | Ablations at n=54: full prompt 26, without examples 24, without decision order 23. Three structurally different prompts inside three notes means the ceiling is the model and how it is being asked, not the words. Both blocks earn their place, so both stay — but further rewording is not worth device time. Next levers in order: few-shot as real chat turns rather than one flat user turn; scoring the nine label tokens instead of free generation; then a larger model. |
+| 2026-07-21 | **Two labels act as attractors**: REFLECTION takes 16 wrong notes, PROJECT 11 | They are the last few-shot example and the most technical-sounding one — classic recency and topic bias, and evidence the model pattern-matches the examples rather than following the numbered rules. FACT scores 0/6: every technical fact is read as PROJECT or REFLECTION. This is the single clearest target for the structural work above. |
 | 2026-07-21 | **No WorkManager; classification runs in the dashboard's ViewModel scope** | The queue is durable in SQLite, so abandoning a pass mid-inference costs nothing but a retry on next launch. WorkManager earns its dependency when something must act on memories while the app is closed — a reminder or a nudge — which is M4+ work. |
 | 2026-07-19 | **Never ask a small model for JSON** | 1.5B models emit malformed JSON often enough to be a real failure source. Classification asks for one word from a closed set and validates against the enum, falling back to `UNCLASSIFIED`. Robust by construction, not by prompt-begging. |
 
@@ -146,7 +148,13 @@ action. The type appears on the card. First milestone where memory evolves on it
       tests green; v1→v2 auto-migration verified against the phone's real database
 - [x] 6 · `feat(app): background classification with type on cards` — the payoff. Verified on
       hardware: captured by voice/text, labelled with no user action, label on the card.
+      The *mechanism* is done; the labels are right 48% of the time (see the decision log).
 - [ ] 7 · `docs: update README and plan.md`
+
+**Open question before M3 closes:** 48% on a 9-way task (chance is 11%) is well above random
+and well below useful. Either accept it and let M4's structural work improve it, or spend one
+more commit on few-shot-as-chat-turns before calling the milestone done. Deliberately not
+decided here — it is a judgement about how wrong a visible label may be.
 
 Commits 1–3 and 5 produce nothing visible. That is the honest shape of this milestone.
 
@@ -184,7 +192,8 @@ Per principle 5, M4 should be **retrieval**, not a bigger model.
 | Ktor | A networked tool exists. The model download uses Android's `DownloadManager`. |
 | In-app model picker | More than one model is genuinely in use. |
 | Re-classifying already-labelled memories | The prompt improves *and* enough memories carry a label from an older prompt to be worth a pass. Improvements only reach `UNCLASSIFIED` memories, so today's wrong labels stay wrong. Cheap when wanted: one UPDATE back to `UNCLASSIFIED`. |
-| Better classification than 7/9 | The two remaining misses justify the cost. Next levers, in order: few-shot as real chat turns rather than one flat user turn (needs a JNI change), then a 3B-class model (~2GB, 2–3× slower per note). |
+| Better classification than 26/54 | Wrong labels on the dashboard become annoying enough to act on. Levers in measured order: few-shot as real chat turns rather than one flat user turn (JNI change); scoring the nine label tokens and taking the argmax instead of generating freely (JNI change, also yields a confidence margin); a 3B-class model (~2GB, 2–3× slower per note). Prompt rewording is spent — see the ablations in the decision log. |
+| Grammar-constrained decoding (GBNF) | Output stops being a clean label, **or** a confidence margin is wanted for a clarify-when-unsure loop. Not needed for correctness today: across six measured runs every raw output was already a valid label, so the invalid-output fallback has never fired. It constrains form, and the problem is meaning. |
 
 ---
 
