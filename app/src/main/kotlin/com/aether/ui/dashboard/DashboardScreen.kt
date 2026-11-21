@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -47,15 +48,17 @@ import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryDay
 import com.aether.domain.memory.MemorySource
 import com.aether.domain.memory.MemoryType
+import com.aether.domain.timeline.TimelineDay
+import com.aether.domain.timeline.TimelineItem
 import com.aether.ui.theme.AetherTheme
 import java.time.Instant
 import java.time.LocalDate
 
 /**
- * The home screen: what Aether currently knows, newest first.
+ * The home screen: what Aether currently knows and active assistant routines, newest first.
  *
- * Deliberately not a chat screen. A chat log shows what you said; this shows
- * what Aether remembers, which is the thing worth opening the app for.
+ * Integrates user thoughts, assistant interventions, execution receipts,
+ * follow-up check-ins, and causal reflections into a unified timeline stream.
  */
 @Composable
 internal fun DashboardContent(
@@ -79,31 +82,70 @@ internal fun DashboardContent(
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (pendingAction != null) {
-            item(key = "pending-action-${pendingAction.id}") {
-                ActiveInterventionCard(
-                    action = pendingAction,
-                    onExecute = onExecuteAction,
-                    onDismiss = onDismissAction,
-                )
+        // If unified timeline days are present, render the complete assistant stream
+        if (state.timelineDays.isNotEmpty()) {
+            state.timelineDays.forEach { day ->
+                item(key = "timeline-header-${day.date}") {
+                    DayHeader(date = day.date)
+                }
+                items(items = day.items, key = { it.id }) { item ->
+                    when (item) {
+                        is TimelineItem.Thought -> {
+                            MemoryCard(memory = item.memory, onDelete = { onDelete(item.memory) })
+                        }
+                        is TimelineItem.Intervention -> {
+                            ActiveInterventionCard(
+                                action = item.action,
+                                onExecute = onExecuteAction,
+                                onDismiss = onDismissAction,
+                            )
+                        }
+                        is TimelineItem.FollowUpCheckIn -> {
+                            ActiveFollowUpCard(
+                                action = item.action,
+                                onRespond = onRespondFollowUp,
+                            )
+                        }
+                        is TimelineItem.ExecutedReceipt -> {
+                            ExecutedReceiptCard(action = item.action)
+                        }
+                        is TimelineItem.EvaluatedReflection -> {
+                            EvaluatedReflectionCard(reflection = item)
+                        }
+                        is TimelineItem.DismissedReceipt -> {
+                            DismissedReceiptCard(action = item.action)
+                        }
+                    }
+                }
             }
-        }
+        } else {
+            // Legacy / fallback rendering for tests or preview
+            if (pendingAction != null) {
+                item(key = "pending-action-${pendingAction.id}") {
+                    ActiveInterventionCard(
+                        action = pendingAction,
+                        onExecute = onExecuteAction,
+                        onDismiss = onDismissAction,
+                    )
+                }
+            }
 
-        if (pendingFollowUp != null) {
-            item(key = "pending-followup-${pendingFollowUp.id}") {
-                ActiveFollowUpCard(
-                    action = pendingFollowUp,
-                    onRespond = onRespondFollowUp,
-                )
+            if (pendingFollowUp != null) {
+                item(key = "pending-followup-${pendingFollowUp.id}") {
+                    ActiveFollowUpCard(
+                        action = pendingFollowUp,
+                        onRespond = onRespondFollowUp,
+                    )
+                }
             }
-        }
 
-        state.days.forEach { day ->
-            item(key = "header-${day.date}") {
-                DayHeader(day = day)
-            }
-            items(items = day.memories, key = { it.id }) { memory ->
-                MemoryCard(memory = memory, onDelete = { onDelete(memory) })
+            state.days.forEach { day ->
+                item(key = "header-${day.date}") {
+                    DayHeader(date = day.date)
+                }
+                items(items = day.memories, key = { it.id }) { memory ->
+                    MemoryCard(memory = memory, onDelete = { onDelete(memory) })
+                }
             }
         }
     }
@@ -220,24 +262,149 @@ private fun ActiveFollowUpCard(
 }
 
 @Composable
-private fun DayHeader(day: MemoryDay, modifier: Modifier = Modifier) {
+private fun ExecutedReceiptCard(
+    action: ActionRecord,
+    modifier: Modifier = Modifier,
+) {
+    val hour = action.toolParams["hour"]?.toIntOrNull() ?: 7
+    val minute = action.toolParams["minute"]?.toIntOrNull() ?: 0
+    val label = action.toolParams["label"] ?: "Aether Routine"
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 2.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Column {
+                Text(
+                    text = "Alarm Scheduled in Clock",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "%02d:%02d • %s".format(hour, minute, label),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EvaluatedReflectionCard(
+    reflection: TimelineItem.EvaluatedReflection,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ),
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "🧠 Assistant Reflection",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (reflection.userReply.isNotBlank()) {
+                Text(
+                    text = "You replied: \"${reflection.userReply}\"",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            reflection.blocker?.let { blocker ->
+                Surface(
+                    shape = MaterialTheme.shapes.extraSmall,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                ) {
+                    Text(
+                        text = "Diagnosed Blocker: $blocker",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
+            Text(
+                text = reflection.reflectionNote
+                    ?: "Observed blocker in routine. Adapting upcoming suggestions to remove friction.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DismissedReceiptCard(
+    action: ActionRecord,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        ),
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 2.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Routine suggestion dismissed",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DayHeader(date: LocalDate, modifier: Modifier = Modifier) {
     Text(
-        text = day.date.toDayLabel(),
+        text = date.toDayLabel(),
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         modifier = modifier
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            // Marked as a heading so screen readers can jump between days.
             .semantics { heading() },
     )
 }
 
 /**
- * A single memory.
- *
- * Delete is a long-press with an overflow menu rather than a swipe. A swipe
- * would need a visible non-gesture alternative anyway to remain usable with
- * assistive tech, so it is strictly more code for the same outcome.
+ * A single memory card.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -277,10 +444,18 @@ private fun MemoryCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    // Nothing is shown while a memory is unclassified. A
-                    // "pending" chip would advertise machinery the user did
-                    // not ask for and cannot act on; the type appearing on its
-                    // own is the whole point.
+                    if (memory.source == MemorySource.MANUAL_VOICE) {
+                        Surface(
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                        ) {
+                            Text(
+                                text = "Voice",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                            )
+                        }
+                    }
                     if (memory.type != MemoryType.UNCLASSIFIED) {
                         TypeLabel(type = memory.type)
                     }
@@ -304,13 +479,6 @@ private fun MemoryCard(
     }
 }
 
-/**
- * The type a memory was classified as.
- *
- * Text, not an icon: nine types have no icon set anyone would read correctly,
- * and a wrong-looking glyph is harder to ignore than a word. Not a chip
- * either — chips look tappable, and this is a statement, not an action.
- */
 @Composable
 private fun TypeLabel(type: MemoryType, modifier: Modifier = Modifier) {
     Surface(
@@ -326,13 +494,6 @@ private fun TypeLabel(type: MemoryType, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * First-run guidance.
- *
- * Aether has no onboarding flow: its core action is obvious, so a carousel
- * would be skipped and would delay the first capture. The empty state teaches
- * the one thing worth knowing, exactly when it is relevant.
- */
 @Composable
 private fun EmptyState(modifier: Modifier = Modifier) {
     Column(
@@ -348,7 +509,7 @@ private fun EmptyState(modifier: Modifier = Modifier) {
             textAlign = TextAlign.Center,
         )
         Text(
-            text = "Capture a thought and Aether will start remembering it for you.",
+            text = "Type or speak what's on your mind below, and Aether will quietly assist your routines.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

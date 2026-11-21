@@ -21,35 +21,42 @@ class EvaluateFollowUpUseCase(
         val record = actionRepository.getById(actionId) ?: return null
         if (!record.canTransitionTo(ActionStatus.EVALUATED)) return null
 
-        val evaluated = record.transitionTo(
+        val lower = response.lowercase().trim()
+        val isSuccess = lower.contains("yes") || lower.contains("did") ||
+                lower.contains("went") || lower.contains("made it") ||
+                lower.contains("crushed") || lower.contains("done")
+
+        val blocker = if (isSuccess) null else when {
+            lower.contains("sleep") || lower.contains("late") ||
+                    lower.contains("tired") || lower.contains("groggy") ||
+                    lower.contains("alarm") || lower.contains("bed") -> "sleep_debt"
+            lower.contains("sore") || lower.contains("hurt") ||
+                    lower.contains("pain") || lower.contains("injury") ||
+                    lower.contains("injured") -> "physical_soreness"
+            lower.contains("work") || lower.contains("meeting") ||
+                    lower.contains("deadline") || lower.contains("busy") ||
+                    lower.contains("overtime") -> "work_overtime"
+            else -> "unknown_friction"
+        }
+
+        val updatedParams = if (blocker != null) {
+            record.toolParams + ("blocker" to blocker)
+        } else {
+            record.toolParams
+        }
+
+        val evaluated = record.copy(toolParams = updatedParams).transitionTo(
             newStatus = ActionStatus.EVALUATED,
             now = now,
+            outcomeNote = response,
         )
         actionRepository.save(evaluated)
 
         val thread = threadRepository.getById(record.threadId)
         if (thread != null) {
-            val lower = response.lowercase().trim()
-            val isSuccess = lower.contains("yes") || lower.contains("did") ||
-                    lower.contains("went") || lower.contains("made it") ||
-                    lower.contains("crushed") || lower.contains("done")
-
             if (isSuccess) {
                 threadRepository.save(thread.recordSuccess(now))
-            } else {
-                // Diagnose root blockers
-                val blocker = when {
-                    lower.contains("sleep") || lower.contains("late") ||
-                            lower.contains("tired") || lower.contains("groggy") ||
-                            lower.contains("alarm") || lower.contains("bed") -> "sleep_debt"
-                    lower.contains("sore") || lower.contains("hurt") ||
-                            lower.contains("pain") || lower.contains("injury") ||
-                            lower.contains("injured") -> "physical_soreness"
-                    lower.contains("work") || lower.contains("meeting") ||
-                            lower.contains("deadline") || lower.contains("busy") ||
-                            lower.contains("overtime") -> "work_overtime"
-                    else -> "unknown_friction"
-                }
+            } else if (blocker != null) {
                 threadRepository.save(thread.withBlocker(blocker, now))
             }
         }

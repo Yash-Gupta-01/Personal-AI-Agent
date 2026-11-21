@@ -10,6 +10,9 @@ interface ActionRecordRepository {
     /** Emits pending actions (PROPOSED or APPROVED), newest first. */
     fun observePending(): Flow<List<ActionRecord>>
 
+    /** Emits all actions (any status), newest first. */
+    fun observeAll(): Flow<List<ActionRecord>> = kotlinx.coroutines.flow.emptyFlow()
+
     /** Emits executed actions awaiting follow-up evaluation, newest first. */
     fun observePendingFollowUps(): Flow<List<ActionRecord>>
 

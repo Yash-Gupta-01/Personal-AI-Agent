@@ -1,11 +1,15 @@
 package com.aether.ui.dashboard
 
+import com.aether.domain.action.ActionRecord
+import com.aether.domain.action.ActionRecordRepository
+import com.aether.domain.action.ActionStatus
 import com.aether.domain.llm.LlmClient
 import com.aether.domain.memory.ClassifyMemories
 import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryRepository
 import com.aether.domain.memory.MemorySource
 import com.aether.domain.memory.MemoryType
+import com.aether.domain.timeline.TimelineItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -194,5 +198,96 @@ class DashboardViewModelTest {
         )
 
         assertFalse(viewModel.uiState.first { !it.isEmpty }.isEmpty)
+    }
+
+    @Test
+    fun `timeline reflects both memories and active action proposals`() = runTest {
+        val now = Instant.parse("2026-11-22T08:00:00Z")
+        val actionFlow = MutableStateFlow<List<ActionRecord>>(emptyList())
+        val actionRepo = object : ActionRecordRepository {
+            override fun observePending() = actionFlow
+            override fun observeAll() = actionFlow
+            override fun observePendingFollowUps() = actionFlow
+            override fun observeForThread(threadId: String) = actionFlow
+            override suspend fun getLatestPendingFollowUp(): ActionRecord? = null
+            override suspend fun getById(id: String): ActionRecord? = null
+            override suspend fun save(record: ActionRecord) {
+                actionFlow.value = actionFlow.value.filterNot { it.id == record.id } + record
+            }
+            override suspend fun delete(id: String) {
+                actionFlow.value = actionFlow.value.filterNot { it.id == id }
+            }
+        }
+
+        val viewModel = DashboardViewModel(
+            repository = repository,
+            classifyMemories = ClassifyMemories(repository, llmClient),
+            actionRecordRepository = actionRepo,
+        )
+
+        memories.value = listOf(Memory.capture("missed gym again", MemorySource.MANUAL_TEXT, now))
+        actionFlow.value = listOf(
+            ActionRecord.propose(
+                threadId = "gym",
+                toolName = "SetAlarmTool",
+                toolParams = mapOf("nudge_title" to "Morning Gym Routine"),
+                now = now.plusSeconds(1),
+            )
+        )
+
+        val state = viewModel.uiState.first { it.timelineDays.isNotEmpty() && it.timelineDays.first().items.size == 2 }
+        val day = state.timelineDays.single()
+
+        assertEquals(2, day.items.size)
+        assertTrue(day.items[0] is TimelineItem.Intervention)
+        assertTrue(day.items[1] is TimelineItem.Thought)
+    }
+
+    @Test
+    fun `timeline reflects executed receipts and follow-up check-ins`() = runTest {
+        val now = Instant.parse("2026-11-22T08:00:00Z")
+        val actionFlow = MutableStateFlow<List<ActionRecord>>(emptyList())
+        val actionRepo = object : ActionRecordRepository {
+            override fun observePending() = actionFlow
+            override fun observeAll() = actionFlow
+            override fun observePendingFollowUps() = actionFlow
+            override fun observeForThread(threadId: String) = actionFlow
+            override suspend fun getLatestPendingFollowUp(): ActionRecord? = null
+            override suspend fun getById(id: String): ActionRecord? = null
+            override suspend fun save(record: ActionRecord) {
+                actionFlow.value = actionFlow.value.filterNot { it.id == record.id } + record
+            }
+            override suspend fun delete(id: String) {
+                actionFlow.value = actionFlow.value.filterNot { it.id == id }
+            }
+        }
+
+        val viewModel = DashboardViewModel(
+            repository = repository,
+            classifyMemories = ClassifyMemories(repository, llmClient),
+            actionRecordRepository = actionRepo,
+        )
+
+        val executedAction = ActionRecord(
+            id = "act-1",
+            threadId = "gym",
+            toolName = "SetAlarmTool",
+            toolParams = mapOf("hour" to "7", "minute" to "0"),
+            status = ActionStatus.OBSERVED,
+            proposedAt = now.minusSeconds(3600),
+            executedAt = now.minusSeconds(1800),
+            observedAt = now,
+            followUpDueAt = now,
+            outcomeNote = null,
+            createdAt = now.minusSeconds(3600),
+            updatedAt = now,
+        )
+        actionFlow.value = listOf(executedAction)
+
+        val state = viewModel.uiState.first { it.timelineDays.isNotEmpty() }
+        val item = state.timelineDays.single().items.single()
+
+        assertTrue(item is TimelineItem.FollowUpCheckIn)
+        assertEquals("act-1", (item as TimelineItem.FollowUpCheckIn).action.id)
     }
 }

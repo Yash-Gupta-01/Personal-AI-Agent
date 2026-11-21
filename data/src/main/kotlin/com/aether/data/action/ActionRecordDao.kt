@@ -11,6 +11,9 @@ internal interface ActionRecordDao {
     @Query("SELECT * FROM action_records WHERE status IN ('PROPOSED', 'APPROVED') ORDER BY proposed_at DESC")
     fun observePending(): Flow<List<ActionRecordEntity>>
 
+    @Query("SELECT * FROM action_records ORDER BY proposed_at DESC")
+    fun observeAll(): Flow<List<ActionRecordEntity>>
+
     @Query("SELECT * FROM action_records WHERE status IN ('EXECUTED', 'OBSERVED') ORDER BY executed_at DESC")
     fun observePendingFollowUps(): Flow<List<ActionRecordEntity>>
 

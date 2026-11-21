@@ -17,12 +17,16 @@ import com.aether.domain.memory.MemoryDay
 import com.aether.domain.memory.MemoryRepository
 import com.aether.domain.memory.MemorySource
 import com.aether.domain.memory.groupByDay
+import com.aether.domain.timeline.TimelineDay
+import com.aether.domain.timeline.buildTimeline
 import com.aether.tools.alarm.SetAlarmTool
 import com.aether.tools.notification.NotificationPromptTool
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -38,9 +42,10 @@ import javax.inject.Inject
  * so being offline is normal operation, not degradation.
  */
 data class DashboardUiState(
+    val timelineDays: List<TimelineDay> = emptyList(),
     val days: List<MemoryDay> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = days.isEmpty()
+    val isEmpty: Boolean get() = timelineDays.isEmpty() && days.isEmpty()
 }
 
 @HiltViewModel
@@ -71,13 +76,19 @@ class DashboardViewModel @Inject constructor(
     }
 
     val uiState: StateFlow<DashboardUiState> =
-        repository.observeActive()
-            .map { memories -> DashboardUiState(days = memories.groupByDay()) }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-                initialValue = DashboardUiState(),
+        combine(
+            repository.observeActive(),
+            actionRecordRepository?.observeAll() ?: flowOf(emptyList()),
+        ) { memories, actions ->
+            DashboardUiState(
+                timelineDays = buildTimeline(memories, actions),
+                days = memories.groupByDay(),
             )
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = DashboardUiState(),
+        )
 
     val restraintConfig: StateFlow<com.aether.domain.policy.RestraintConfig> =
         restraintConfigRepository?.observeConfig()
