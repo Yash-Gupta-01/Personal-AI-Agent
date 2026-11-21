@@ -31,6 +31,12 @@ internal class RoomActionRecordRepository @Inject constructor(
         dao.upsert(record.toEntity())
     }
 
+    override suspend fun countProactivePostedInWindow(start: java.time.Instant, end: java.time.Instant): Int =
+        dao.countPostedInWindow(start.toEpochMilli(), end.toEpochMilli())
+
+    override suspend fun getLastProactivePostedTimestamp(): java.time.Instant? =
+        dao.getLastPostedTimestamp()?.let { java.time.Instant.ofEpochMilli(it) }
+
     override suspend fun delete(id: String) {
         dao.delete(id)
     }

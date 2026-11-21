@@ -60,10 +60,16 @@ class LongitudinalEvalTest {
 
     private val actionRepo = object : ActionRecordRepository {
         override fun observePending(): Flow<List<ActionRecord>> = flowOf(actionStore.values.filter { it.status == ActionStatus.PROPOSED || it.status == ActionStatus.APPROVED })
+        override fun observePendingFollowUps(): Flow<List<ActionRecord>> = flowOf(actionStore.values.filter { it.status == ActionStatus.EXECUTED })
+        override suspend fun getLatestPendingFollowUp(): ActionRecord? = actionStore.values.filter { it.status == ActionStatus.EXECUTED }.maxByOrNull { it.executedAt ?: Instant.EPOCH }
         override fun observeForThread(threadId: String): Flow<List<ActionRecord>> = flowOf(actionStore.values.filter { it.threadId == threadId })
         override suspend fun getById(id: String): ActionRecord? = actionStore[id]
         override suspend fun save(record: ActionRecord) { actionStore[record.id] = record }
         override suspend fun delete(id: String) { actionStore.remove(id) }
+        override suspend fun countProactivePostedInWindow(start: Instant, end: Instant): Int =
+            actionStore.values.count { it.proposedAt >= start && it.proposedAt < end && it.status !in setOf(ActionStatus.SUPPRESSED, ActionStatus.CANCELLED) }
+        override suspend fun getLastProactivePostedTimestamp(): Instant? =
+            actionStore.values.filter { it.status !in setOf(ActionStatus.SUPPRESSED, ActionStatus.CANCELLED) }.maxByOrNull { it.proposedAt }?.proposedAt
     }
 
     @Before

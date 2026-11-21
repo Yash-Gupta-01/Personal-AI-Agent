@@ -1,6 +1,7 @@
 package com.aether.domain.action
 
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 
 /**
  * Port for proactive action persistence and lifecycle queries.
@@ -26,4 +27,10 @@ interface ActionRecordRepository {
 
     /** Deletes an action record. */
     suspend fun delete(id: String)
+
+    /** Counts proactive actions posted in the specified window [start, end). */
+    suspend fun countProactivePostedInWindow(start: Instant, end: Instant): Int = 0
+
+    /** Returns the timestamp of the most recent proactive intervention posted. */
+    suspend fun getLastProactivePostedTimestamp(): Instant? = null
 }

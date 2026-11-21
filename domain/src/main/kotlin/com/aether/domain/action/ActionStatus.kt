@@ -3,15 +3,18 @@ package com.aether.domain.action
 /**
  * State in the deterministic proactive action lifecycle:
  *
- * PROPOSED ─► APPROVED ─► EXECUTED ─► OBSERVED ─► EVALUATED
- *     │           │           │           │
- *     ├───────────┴───────────┼───────────┤
- *     ▼                       ▼           ▼
- *  DISMISSED               FAILED      EXPIRED
+ * PROPOSED ─► POSTED ─► APPROVED ─► EXECUTED ─► OBSERVED ─► EVALUATED
+ *     │           │          │           │           │
+ *     ├───────────┼──────────┴───────────┼───────────┤
+ *     ▼           ▼                      ▼           ▼
+ *  SUPPRESSED  DISMISSED              FAILED      EXPIRED
  */
 enum class ActionStatus {
-    /** Proposed by reasoning agent, awaiting 1-tap confirmation or quiet timeout. */
+    /** Proposed by reasoning agent, awaiting restraint evaluation. */
     PROPOSED,
+
+    /** Posted to notification shade by NotificationManager. Consumes circadian budget. */
+    POSTED,
 
     /** User confirmed the suggestion (or auto-approved by policy). */
     APPROVED,
@@ -33,4 +36,10 @@ enum class ActionStatus {
 
     /** Execution failed (e.g. no clock app found on device). Terminal state. */
     FAILED,
+
+    /** Suppressed by restraint policy or quiet hours before reaching notification shade. */
+    SUPPRESSED,
+
+    /** Cancelled or superseded before user interaction. */
+    CANCELLED,
 }

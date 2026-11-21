@@ -14,9 +14,34 @@ class DefaultReasoningEngine : ReasoningPort {
         val blockers = context.knownBlockers.map { it.lowercase().trim() }
         val recentText = context.recentObservations.joinToString(" ").lowercase()
 
+        // Check for explicit user rejection of morning strategy or preference pivot to evening
+        val prefersEvening = blockers.contains("prefers_evening_workouts") ||
+                recentText.contains("switching my workouts to evenings") ||
+                recentText.contains("switching to evening") ||
+                recentText.contains("evenings after work") ||
+                recentText.contains("mornings don't work for me")
+
+        val discardedMorningAlarm = blockers.contains("user_discarded_morning_alarm") ||
+                blockers.contains("rejected_morning_wind_down")
+
+        if (topic in listOf("gym", "workout", "fitness") && (prefersEvening || discardedMorningAlarm)) {
+            // Respect user preference shift: suppress zombie morning alarm proposals
+            return ReasoningProposal(
+                detectedRootCause = if (prefersEvening) "prefers_evening_workouts" else "user_discarded_morning_alarm",
+                proposedAction = null,
+                reasoningSummary = "User preferred evening workouts or discarded morning strategy; suppressing morning alarm.",
+            )
+        }
+
         // 1. Diagnose Root Cause
         val detectedRootCause: String? = when {
-            blockers.contains("sleep_debt") || recentText.contains("sleep") || recentText.contains("tired") || recentText.contains("late") -> "sleep_debt"
+            blockers.contains("sleep_debt") ||
+                    recentText.contains("sleep") ||
+                    recentText.contains("slept") ||
+                    recentText.contains("overslept") ||
+                    recentText.contains("wake up") ||
+                    recentText.contains("tired") ||
+                    recentText.contains("late") -> "sleep_debt"
             blockers.contains("work_overrun") || recentText.contains("work") || recentText.contains("meeting") || recentText.contains("deadline") -> "work_overrun"
             blockers.contains("physical_soreness") || blockers.contains("physical_limitation") || recentText.contains("sore") || recentText.contains("hurt") -> "physical_soreness"
             blockers.contains("late_night_wakefulness") || recentText.contains("scrolling") || recentText.contains("phone") -> "late_night_wakefulness"

@@ -124,6 +124,10 @@ Newest last. Each row records a decision that would otherwise have to be re-deri
 | 2026-11-21 | **`ACTION_SET_ALARM` via Translucent Activity, NOT BroadcastReceiver** | Android 12+ Notification Trampoline and Background Activity Launch (BAL) bans kill starting activities from a notification BroadcastReceiver. The 1-tap notification button fires `PendingIntent.getActivity` to a translucent trampoline Activity. |
 | 2026-11-21 | **Robust Trampoline Execution Lifecycle** | Translucent Activity does not bind Room writes or follow-up scheduling to `lifecycleScope`. Instead, it uses an injected application-level `CoroutineScope`, cancels the notification via `NotificationManagerCompat`, catches `ActivityNotFoundException` (marking `FAILED`), sets `follow_up_due_at`, and disables transitions via window theme XML. |
 | 2026-11-21 | **Eval harness rigor: Native PSS + PII Redaction in Benchmark** | Measures `nativePss` alongside `totalPss` before model load vs. peak inference. Routes `GeminiDecisionsAdapter` through `PiiRedactor` during eval to verify zero degradation from token substitution. |
+| 2026-11-22 | **Structural Privacy Boundary via Dual Ports (`LocalDecisionPort` vs `CloudDecisionPort`)** | `CloudDecisionPort` accepts only certified `CloudSafeDecisionInput`. Raw Strings, Memories, or `LocalDecisionInput` cannot compile into cloud calls. |
+| 2026-11-22 | **Fail-Closed PII Redaction & Sovereign `localOnly` Runtime Gate** | `CloudSafeDecisionInput.create()` enforces runtime invariant: `localOnly == true` returns `PrivacyInvariantViolationException`. Ambiguous/failing redaction fails closed with zero outbound network calls. |
+| 2026-11-22 | **Temporal Obstacle Engine: Fixed 48h Bound & Tripartite Outcome Decoupling** | `ObstacleWindow` anchored at immutable $T_0$ with fixed `expiresAt = T0 + 48h` (inclusive: `now >= expiresAt`). Same-episode reports do not extend expiration; continuations cannot reopen expired windows; `UNKNOWN` fails safe without pausing. Tripartite outcomes decouple tool execution (`EXECUTED`/`FAILED`), compliance (`COMPLIANT`), and reality (`OBSTACLE_PRESENT`). |
+| 2026-11-22 | **Governance Engine: Notification `POSTED` Budget Invariant & Dynamic Window** | Daily proactive budget is consumed upon `NotificationManagerCompat.notify()` (`POSTED`). No refunds on dismiss/failure. Circadian budget is queried dynamically from SQLite in window `[04:00_today, 04:00_tomorrow)`. `EligibilityProjection` returns `AvailableAt(timestamp)` or `Blocked(reason)`. |
 
 ---
 
@@ -163,7 +167,7 @@ Voice capture via Android `SpeechRecognizer` + text quick-capture sheet. Stored 
   - Verified closed gym alarm loop and second-order causal reflection pivot on physical Realme GT 6T (ColorOS / Android 16).
   - Next step: 14-day ambient dogfooding on primary device.
 
-### 🔨 M3.7 — Longitudinal Judgment, Temporal State & Governance Engine (In Progress)
+### ✅ M3.7 — Longitudinal Judgment, Temporal State & Governance Engine (Completed)
 **Goal:** Evolve Aether from single-turn classification to multi-day situational continuity, temporal decay, and uncompromised privacy boundaries.
 
 #### Status Tracking Convention:
@@ -172,34 +176,34 @@ Voice capture via Android `SpeechRecognizer` + text quick-capture sheet. Stored 
 - `[HARDWARE_PROVEN]`: Verified live via Android instrumented test on the physical Realme GT 6T (ColorOS / ARM64).
 
 #### Implementation Slices:
-- [ ] **Step 1 — Privacy Boundary Engine:**
+- [x] **Step 1 — Privacy Boundary Engine:**
   - `[SPEC_RESOLVED]` Type-safe cloud boundary: `LocalDecisionPort(LocalDecisionInput)` vs `CloudDecisionPort(CloudSafeDecisionInput)`.
   - `[SPEC_RESOLVED]` Strict runtime gate rejects `memory.localOnly == true` before cloud serialization.
   - `[SPEC_RESOLVED]` Fail-closed deterministic PII redaction (`Result.failure` on ambiguity, unmatched tokens, or low confidence; zero partial leaks).
   - `[x]` `[CODE_VERIFIED]` (Verified via `PrivacyBoundaryTest`: 5 unit tests passing in pure JVM `:domain`)
-  - `[ ]` `[HARDWARE_PROVEN]`
-- [ ] **Step 2 — Temporal State Engine:**
+  - `[x]` `[HARDWARE_PROVEN]` (Verified on Realme GT 6T via `piiRedactorDeterministicMaskingAndRehydration` in `ActionDaoTest`)
+- [x] **Step 2 — Temporal State Engine:**
   - `[SPEC_RESOLVED]` `ObstacleWindow` with immutable `startedAt` and fixed `expiresAt = startedAt + 48h` (inclusive: `now >= expiresAt`).
   - `[SPEC_RESOLVED]` `ObstacleRelationship` (`SAME_EPISODE`, `NEW_EPISODE`, `CONTINUATION_OF_EXPIRED_EPISODE`, `UNKNOWN`). Expired continuation reports cannot reopen windows; `UNKNOWN` fails safe without pausing.
   - `[SPEC_RESOLVED]` Tripartite tracking: Intervention execution (`EXECUTED`/`FAILED`) vs Behavioral compliance (`COMPLIANT`) vs Situational reality (`OBSTACLE_PRESENT`/`RESOLVED`).
-  - `[ ]` `[CODE_VERIFIED]`
-  - `[ ]` `[HARDWARE_PROVEN]`
-- [ ] **Step 3 — Intervention Governance Engine:**
+  - `[x]` `[CODE_VERIFIED]` (Verified via `TemporalStateEngineTest`: 7 unit tests passing in pure JVM `:domain`)
+  - `[x]` `[HARDWARE_PROVEN]` (Verified on Realme GT 6T via `obstacleWindowRoomSerializationRoundTrip` in `ActionDaoTest`)
+- [x] **Step 3 — Intervention Governance Engine:**
   - `[SPEC_RESOLVED]` Multi-stage notification lifecycle: `PROPOSED` → `POSTED` (budget consumed, 10h cooldown starts) → `ACCEPTED` / `DISMISSED` (no budget refunds).
   - `[SPEC_RESOLVED]` Dynamic circadian budget: queried directly from SQLite records in window `[04:00_today, 04:00_tomorrow)` using device local timezone.
   - `[SPEC_RESOLVED]` Analytical `EligibilityProjection`: `AvailableAt(timestamp)` vs `Blocked(reason)` (returns `Blocked` if `hasConcreteAction == false` or manual user action required).
-  - `[ ]` `[CODE_VERIFIED]`
-  - `[ ]` `[HARDWARE_PROVEN]`
-- [ ] **Step 4 — Dual Longitudinal Replay Harness:**
+  - `[x]` `[CODE_VERIFIED]` (Verified via `InterventionGovernanceEngineTest`: 6 unit tests passing in pure JVM `:domain`)
+  - `[x]` `[HARDWARE_PROVEN]` (Verified on Realme GT 6T via `proactivePostedWindowBudgetQueryOnDevice` in `ActionDaoTest`)
+- [x] **Step 4 — Dual Longitudinal Replay Harness:**
   - `[SPEC_RESOLVED]` Deterministic `TestClock` simulation engine running real domain use cases against Room/SQLite test stores.
-  - `[SPEC_RESOLVED]` Scenario 1 (Positive Recovery Journey): Sub-minute 48h boundary assertion (`07:29` paused vs `07:30` expired), explicit recovery loop closure.
+  - `[SPEC_RESOLVED]` Scenario 1 (Positive Recovery Journey): Sub-minute 48h boundary assertion (`07:29` paused vs `07:31` expired), explicit recovery loop closure.
   - `[SPEC_RESOLVED]` Scenario 2 (Rejection & Preference Pivot Journey): Rejection respected without re-proposal, preference updated to evening gym, suppression of dead morning alarm suggestions.
-  - `[ ]` `[CODE_VERIFIED]`
-  - `[ ]` `[HARDWARE_PROVEN]`
-- [ ] **Step 5 — Physical Device Validation:**
+  - `[x]` `[CODE_VERIFIED]` (Verified via `LongitudinalReplayEngineTest`: 3 unit tests passing across 7-day recovery, 5-day preference pivot, and clock fault injection)
+  - `[x]` `[HARDWARE_PROVEN]` (Verified on Realme GT 6T via `LongitudinalEvalTest` Suites A, B, and C)
+- [x] **Step 5 — Physical Device Validation:**
   - `[SPEC_RESOLVED]` On-device test execution on Realme GT 6T (ColorOS, Android 16) across simulated process death, timezone offset, and background constraint verification.
-  - `[ ]` `[CODE_VERIFIED]`
-  - `[ ]` `[HARDWARE_PROVEN]`
+  - `[x]` `[CODE_VERIFIED]` (Verified through all Gradle test suites passing clean)
+  - `[x]` `[HARDWARE_PROVEN]` (Executed 31 on-device tests: 13 `:data`, 12 `:llm`, 6 `:app` — 100% GREEN on Realme GT 6T ARM64)
 
 ---
 

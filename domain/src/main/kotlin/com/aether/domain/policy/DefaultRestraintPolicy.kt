@@ -1,8 +1,11 @@
 package com.aether.domain.policy
 
+import com.aether.domain.action.InterventionCategory
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 
 /**
  * Standard implementation of [RestraintPolicy].
@@ -56,7 +59,71 @@ class DefaultRestraintPolicy : RestraintPolicy {
         return RestraintVerdict.PERMITTED
     }
 
+    override fun projectEligibility(
+        now: Instant,
+        zone: ZoneId,
+        hasConcreteAction: Boolean,
+        category: InterventionCategory,
+        interventionsInCircadianWindow: Int,
+        lastPostedAt: Instant?,
+        threadCooldownUntil: Instant?,
+        consecutiveDismissals: Int,
+        config: RestraintConfig,
+    ): EligibilityProjection {
+        // 1. Non-temporal blocking conditions fail immediately with Blocked(reason)
+        if (!hasConcreteAction) {
+            return EligibilityProjection.Blocked(RestraintVerdict.BLOCKED_NO_CONCRETE_ACTION)
+        }
+        if (consecutiveDismissals >= config.maxConsecutiveDismissalsBeforeCooldown) {
+            return EligibilityProjection.Blocked(RestraintVerdict.BLOCKED_REPEATED_DISMISSALS)
+        }
+
+        // 2. Solicited user commands bypass proactive constraints entirely
+        if (category == InterventionCategory.SOLICITED) {
+            return EligibilityProjection.AvailableAt(now)
+        }
+
+        // 3. Proactive intervention evaluation
+        val isBudgetFree = interventionsInCircadianWindow < config.maxDailyInterventions
+        val isCooldownClear = lastPostedAt == null || now >= lastPostedAt.plus(COOLDOWN_DURATION)
+        val isQuietClear = !config.quietHoursEnabled || !isQuietHours(now.atZone(zone).toLocalTime(), config.quietHoursStart, config.quietHoursEnd)
+        val isThreadClear = threadCooldownUntil == null || now >= threadCooldownUntil
+
+        // Immediate availability check
+        if (isBudgetFree && isCooldownClear && isQuietClear && isThreadClear) {
+            return EligibilityProjection.AvailableAt(now)
+        }
+
+        // 4. Calculate exact clearance timestamp for each active temporal restriction
+        val candidateTimes = mutableListOf<Instant>()
+
+        if (!isBudgetFree) {
+            // Wait for 04:00 AM boundary of the next circadian day
+            candidateTimes.add(CircadianWindow.of(now, zone).end)
+        }
+        if (!isCooldownClear) {
+            candidateTimes.add(lastPostedAt!!.plus(COOLDOWN_DURATION))
+        }
+        if (!isQuietClear) {
+            candidateTimes.add(nextQuietHoursEnd(now, zone, config.quietHoursStart, config.quietHoursEnd))
+        }
+        if (!isThreadClear) {
+            candidateTimes.add(threadCooldownUntil!!)
+        }
+
+        var target = candidateTimes.maxOrNull() ?: now
+
+        // If projected target lands inside quiet hours, snap forward to quiet hours end
+        if (config.quietHoursEnabled && isQuietHours(target.atZone(zone).toLocalTime(), config.quietHoursStart, config.quietHoursEnd)) {
+            target = nextQuietHoursEnd(target, zone, config.quietHoursStart, config.quietHoursEnd)
+        }
+
+        return EligibilityProjection.AvailableAt(target)
+    }
+
     companion object {
+        val COOLDOWN_DURATION: Duration = Duration.ofHours(10)
+
         /**
          * Determines if [time] falls in the window [start] (inclusive) to [end] (exclusive).
          * Supports both same-day intervals (e.g. 13:00 to 15:00) and
@@ -71,6 +138,32 @@ class DefaultRestraintPolicy : RestraintPolicy {
                 // Same-day: [start, end)
                 time >= start && time < end
             }
+        }
+
+        /**
+         * Computes the exact timestamp when quiet hours end relative to [instant] in [zone].
+         */
+        fun nextQuietHoursEnd(instant: Instant, zone: ZoneId, start: LocalTime, end: LocalTime): Instant {
+            val zdt = instant.atZone(zone)
+            val localTime = zdt.toLocalTime()
+            val date = zdt.toLocalDate()
+
+            val endZdt = if (start > end) {
+                // Midnight-wrapping (e.g. 22:00 to 07:00)
+                if (localTime >= start) {
+                    ZonedDateTime.of(date.plusDays(1), end, zone)
+                } else {
+                    ZonedDateTime.of(date, end, zone)
+                }
+            } else {
+                // Same-day (e.g. 13:00 to 15:00)
+                if (localTime >= end) {
+                    ZonedDateTime.of(date.plusDays(1), end, zone)
+                } else {
+                    ZonedDateTime.of(date, end, zone)
+                }
+            }
+            return endZdt.toInstant()
         }
     }
 }

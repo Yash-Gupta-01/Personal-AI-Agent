@@ -1,5 +1,6 @@
 package com.aether.domain.policy
 
+import com.aether.domain.action.InterventionCategory
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -25,7 +26,7 @@ enum class RestraintVerdict {
     /** Blocked: Current local time falls within configured quiet hours. */
     BLOCKED_QUIET_HOURS,
 
-    /** Blocked: Thread is under active cooldown backoff. */
+    /** Blocked: Thread or global intervention is under active cooldown backoff. */
     BLOCKED_ACTIVE_COOLDOWN,
 
     /** Blocked: Repeated dismissals triggered automatic quiet mode. */
@@ -49,4 +50,20 @@ interface RestraintPolicy {
         hasConcreteAction: Boolean,
         config: RestraintConfig = RestraintConfig(),
     ): RestraintVerdict
+
+    /**
+     * Deterministically projects when an intervention will next be eligible
+     * without arbitrary polling loops.
+     */
+    fun projectEligibility(
+        now: Instant,
+        zone: ZoneId,
+        hasConcreteAction: Boolean,
+        category: InterventionCategory,
+        interventionsInCircadianWindow: Int,
+        lastPostedAt: Instant?,
+        threadCooldownUntil: Instant?,
+        consecutiveDismissals: Int,
+        config: RestraintConfig = RestraintConfig(),
+    ): EligibilityProjection
 }

@@ -152,4 +152,86 @@ class ActionDaoTest {
         val rehydrated = piiRedactor.rehydrate(result.redactedText, result.tokenToRealValue)
         assertEquals(original, rehydrated)
     }
+
+    @Test
+    fun obstacleWindowRoomSerializationRoundTrip() = runTest {
+        val obstacle = com.aether.domain.thread.ObstacleWindow(
+            obstacleType = "FEVER",
+            startedAt = now,
+            expiresAt = now.plus(java.time.Duration.ofHours(48)),
+            observationCount = 2,
+        )
+        val thread = TrackedThread(
+            id = "thread-gym-obstacle",
+            topic = "gym",
+            title = "Morning Gym Routine",
+            status = ThreadStatus.ACTIVE,
+            consecutiveMisses = 2,
+            consecutiveSuccesses = 0,
+            activeObstacle = obstacle,
+            knownBlockers = emptyList(),
+            lastObservedAt = now,
+            createdAt = now,
+            updatedAt = now,
+        )
+        threadRepository.save(thread)
+
+        val retrieved = threadRepository.getByTopic("gym")
+        assertNotNull(retrieved)
+        assertNotNull(retrieved!!.activeObstacle)
+        assertEquals("FEVER", retrieved.activeObstacle!!.obstacleType)
+        assertEquals(now, retrieved.activeObstacle!!.startedAt)
+        assertEquals(now.plus(java.time.Duration.ofHours(48)), retrieved.activeObstacle!!.expiresAt)
+        assertEquals(2, retrieved.activeObstacle!!.observationCount)
+    }
+
+    @Test
+    fun proactivePostedWindowBudgetQueryOnDevice() = runTest {
+        val thread = TrackedThread(
+            id = "thread-budget-1",
+            topic = "gym",
+            title = "Morning Gym Routine",
+            status = ThreadStatus.ACTIVE,
+            consecutiveMisses = 1,
+            consecutiveSuccesses = 0,
+            knownBlockers = emptyList(),
+            lastObservedAt = now,
+            createdAt = now,
+            updatedAt = now,
+        )
+        threadRepository.save(thread)
+
+        val start = now
+        val end = now.plus(java.time.Duration.ofHours(24))
+
+        val action1 = ActionRecord.propose(
+            threadId = "thread-budget-1",
+            toolName = "set_alarm",
+            toolParams = mapOf("hour" to "7"),
+            now = now.plus(java.time.Duration.ofHours(1)),
+        )
+        actionRepository.save(action1)
+
+        val action2 = ActionRecord.propose(
+            threadId = "thread-budget-1",
+            toolName = "set_alarm",
+            toolParams = mapOf("hour" to "8"),
+            now = now.plus(java.time.Duration.ofHours(2)),
+        )
+        actionRepository.save(action2.transitionTo(ActionStatus.DISMISSED, now.plus(java.time.Duration.ofHours(2))))
+
+        val action3 = ActionRecord.propose(
+            threadId = "thread-budget-1",
+            toolName = "set_alarm",
+            toolParams = mapOf("hour" to "9"),
+            now = now.plus(java.time.Duration.ofHours(3)),
+        )
+        actionRepository.save(action3.transitionTo(ActionStatus.SUPPRESSED, now.plus(java.time.Duration.ofHours(3))))
+
+        val count = actionRepository.countProactivePostedInWindow(start, end)
+        assertEquals(2, count)
+
+        val lastTs = actionRepository.getLastProactivePostedTimestamp()
+        assertEquals(now.plus(java.time.Duration.ofHours(2)), lastTs)
+    }
 }

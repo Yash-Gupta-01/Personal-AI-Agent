@@ -26,6 +26,12 @@ internal interface ActionRecordDao {
     @Upsert
     suspend fun upsert(record: ActionRecordEntity)
 
+    @Query("SELECT COUNT(*) FROM action_records WHERE proposed_at >= :startEpochMillis AND proposed_at < :endEpochMillis AND status NOT IN ('SUPPRESSED', 'CANCELLED')")
+    suspend fun countPostedInWindow(startEpochMillis: Long, endEpochMillis: Long): Int
+
+    @Query("SELECT proposed_at FROM action_records WHERE status NOT IN ('SUPPRESSED', 'CANCELLED') ORDER BY proposed_at DESC LIMIT 1")
+    suspend fun getLastPostedTimestamp(): Long?
+
     @Query("DELETE FROM action_records WHERE id = :id")
     suspend fun delete(id: String)
 }

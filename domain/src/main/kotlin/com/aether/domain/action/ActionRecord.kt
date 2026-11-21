@@ -34,17 +34,29 @@ data class ActionRecord(
      */
     fun canTransitionTo(target: ActionStatus): Boolean = when (status) {
         ActionStatus.PROPOSED -> target in setOf(
+            ActionStatus.POSTED,
             ActionStatus.APPROVED,
             ActionStatus.EXECUTED,
             ActionStatus.DISMISSED,
             ActionStatus.EXPIRED,
             ActionStatus.FAILED,
+            ActionStatus.SUPPRESSED,
+            ActionStatus.CANCELLED,
+        )
+        ActionStatus.POSTED -> target in setOf(
+            ActionStatus.APPROVED,
+            ActionStatus.EXECUTED,
+            ActionStatus.DISMISSED,
+            ActionStatus.EXPIRED,
+            ActionStatus.FAILED,
+            ActionStatus.CANCELLED,
         )
         ActionStatus.APPROVED -> target in setOf(
             ActionStatus.EXECUTED,
             ActionStatus.DISMISSED,
             ActionStatus.EXPIRED,
             ActionStatus.FAILED,
+            ActionStatus.CANCELLED,
         )
         ActionStatus.EXECUTED -> target in setOf(
             ActionStatus.OBSERVED,
@@ -58,7 +70,9 @@ data class ActionRecord(
         ActionStatus.EVALUATED,
         ActionStatus.DISMISSED,
         ActionStatus.EXPIRED,
-        ActionStatus.FAILED -> false
+        ActionStatus.FAILED,
+        ActionStatus.SUPPRESSED,
+        ActionStatus.CANCELLED -> false
     }
 
     /**
