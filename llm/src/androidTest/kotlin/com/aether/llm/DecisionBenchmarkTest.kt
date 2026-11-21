@@ -8,6 +8,7 @@ import com.aether.domain.decision.DecisionAnswer
 import com.aether.domain.decision.DecisionPort
 import com.aether.domain.decision.DecisionQuestion
 import com.aether.domain.decision.DecisionResult
+import com.aether.domain.privacy.CloudSafeDecisionInput
 import com.aether.llm.decision.GeminiDecisionsAdapter
 import com.aether.llm.decision.HybridDecisionAdapter
 import com.aether.llm.decision.LocalJevDecisionAdapter
@@ -152,14 +153,13 @@ class DecisionBenchmarkTest {
         // Setup Fallback adapter
         fallbackAdapter = HybridDecisionAdapter(
             localAdapter = LocalJevDecisionAdapter(), // un-loaded
-            geminiAdapter = GeminiDecisionsAdapter(piiRedactor = null, apiKeyProvider = { null }),
+            geminiAdapter = GeminiDecisionsAdapter(apiKeyProvider = { null }),
         )
 
         // Setup Gemini adapter if API key was injected via .env / local.properties / BuildConfig
         val apiKey = BuildConfig.GEMINI_API_KEY
         if (apiKey.isNotBlank()) {
             geminiAdapter = GeminiDecisionsAdapter(
-                piiRedactor = null,
                 apiKeyProvider = { apiKey },
             )
         }
@@ -188,7 +188,12 @@ class DecisionBenchmarkTest {
             Log.w("AetherBenchmark", "To run Gemini: Add GEMINI_API_KEY=AIza... to .env in project root.")
             return@runTest
         }
-        runBenchmarkSuite("Method C (Gemini Decisions API with PII Redaction)", adapter)
+        val portWrapper = object : DecisionPort {
+            override suspend fun evaluate(input: String, questions: Map<String, DecisionQuestion>): DecisionResult {
+                return adapter.evaluate(CloudSafeDecisionInput.createForTesting(input), questions)
+            }
+        }
+        runBenchmarkSuite("Method C (Gemini Decisions API with PII Redaction)", portWrapper)
     }
 
     private suspend fun runBenchmarkSuite(methodName: String, port: DecisionPort) {

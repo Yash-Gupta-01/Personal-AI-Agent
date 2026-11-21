@@ -71,6 +71,18 @@
                 <action android:name="com.aether.action.FOLLOW_UP" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".action.AmbientSignalReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT" />
+                <action android:name="com.aether.action.TEST_USER_PRESENT" />
+                <action android:name="android.intent.action.ALARM_DISMISSED" />
+                <action android:name="com.coloros.alarmclock.ALARM_DISMISSED" />
+                <action android:name="com.oplus.alarmclock.ALARM_DISMISS" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

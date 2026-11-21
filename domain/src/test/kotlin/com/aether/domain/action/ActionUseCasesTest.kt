@@ -30,6 +30,9 @@ class ActionUseCasesTest {
             flowOf(actionMap.values.filter { it.threadId == threadId })
 
         override suspend fun getById(id: String): ActionRecord? = actionMap[id]
+        override suspend fun getLatestPendingFollowUp(): ActionRecord? =
+            actionMap.values.filter { it.status == ActionStatus.EXECUTED || it.status == ActionStatus.OBSERVED }
+                .maxByOrNull { it.executedAt ?: Instant.EPOCH }
         override suspend fun save(record: ActionRecord) { actionMap[record.id] = record }
         override suspend fun delete(id: String) { actionMap.remove(id) }
     }

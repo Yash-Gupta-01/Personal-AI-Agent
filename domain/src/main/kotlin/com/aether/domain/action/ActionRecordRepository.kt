@@ -12,6 +12,9 @@ interface ActionRecordRepository {
     /** Emits executed actions awaiting follow-up evaluation, newest first. */
     fun observePendingFollowUps(): Flow<List<ActionRecord>>
 
+    /** Retrieves the most recently executed action awaiting follow-up evaluation. */
+    suspend fun getLatestPendingFollowUp(): ActionRecord?
+
     /** Emits action history for a specific thread, newest first. */
     fun observeForThread(threadId: String): Flow<List<ActionRecord>>
 

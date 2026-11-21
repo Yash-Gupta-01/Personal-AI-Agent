@@ -46,10 +46,18 @@ object LlmModule {
 
     @Provides
     @Singleton
-    fun provideGeminiDecisionsAdapter(
-        piiRedactor: com.aether.domain.privacy.PiiRedactor,
-    ): com.aether.llm.decision.GeminiDecisionsAdapter =
-        com.aether.llm.decision.GeminiDecisionsAdapter(piiRedactor = piiRedactor)
+    fun provideGeminiDecisionsAdapter(): com.aether.llm.decision.GeminiDecisionsAdapter =
+        com.aether.llm.decision.GeminiDecisionsAdapter()
+
+    @Provides
+    @Singleton
+    fun provideCloudDecisionPort(adapter: com.aether.llm.decision.GeminiDecisionsAdapter): com.aether.domain.decision.CloudDecisionPort =
+        adapter
+
+    @Provides
+    @Singleton
+    fun provideLocalDecisionPort(adapter: com.aether.llm.decision.LocalJevDecisionAdapter): com.aether.domain.decision.LocalDecisionPort =
+        adapter
 
     @Provides
     @Singleton

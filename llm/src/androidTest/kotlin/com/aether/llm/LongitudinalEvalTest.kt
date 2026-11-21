@@ -74,9 +74,9 @@ class LongitudinalEvalTest {
 
         val apiKey = BuildConfig.GEMINI_API_KEY
         val gemini = if (apiKey.isNotBlank()) {
-            GeminiDecisionsAdapter(piiRedactor = null, apiKeyProvider = { apiKey })
+            GeminiDecisionsAdapter(apiKeyProvider = { apiKey })
         } else {
-            GeminiDecisionsAdapter(piiRedactor = null, apiKeyProvider = { null })
+            GeminiDecisionsAdapter(apiKeyProvider = { null })
         }
 
         decisionPort = HybridDecisionAdapter(

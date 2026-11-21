@@ -1,5 +1,6 @@
 package com.aether.domain.action
 
+import com.aether.domain.action.ActionStatus
 import com.aether.domain.policy.DefaultRestraintPolicy
 import com.aether.domain.policy.RestraintConfig
 import com.aether.domain.thread.TrackedThread
@@ -30,6 +31,11 @@ class ProcessFrictionNudgeTest {
 
     private val actionRepo = object : ActionRecordRepository {
         override fun observePending(): Flow<List<ActionRecord>> = MutableStateFlow(actions.values.toList())
+        override fun observePendingFollowUps(): Flow<List<ActionRecord>> =
+            MutableStateFlow(actions.values.filter { it.status == ActionStatus.EXECUTED || it.status == ActionStatus.OBSERVED })
+        override suspend fun getLatestPendingFollowUp(): ActionRecord? =
+            actions.values.filter { it.status == ActionStatus.EXECUTED || it.status == ActionStatus.OBSERVED }
+                .maxByOrNull { it.executedAt ?: Instant.EPOCH }
         override fun observeForThread(threadId: String): Flow<List<ActionRecord>> =
             MutableStateFlow(actions.values.filter { it.threadId == threadId })
         override suspend fun getById(id: String): ActionRecord? = actions[id]

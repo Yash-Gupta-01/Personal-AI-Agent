@@ -163,6 +163,44 @@ Voice capture via Android `SpeechRecognizer` + text quick-capture sheet. Stored 
   - Verified closed gym alarm loop and second-order causal reflection pivot on physical Realme GT 6T (ColorOS / Android 16).
   - Next step: 14-day ambient dogfooding on primary device.
 
+### 🔨 M3.7 — Longitudinal Judgment, Temporal State & Governance Engine (In Progress)
+**Goal:** Evolve Aether from single-turn classification to multi-day situational continuity, temporal decay, and uncompromised privacy boundaries.
+
+#### Status Tracking Convention:
+- `[SPEC_RESOLVED]`: Contract defined and logically verified.
+- `[CODE_VERIFIED]`: Implemented in Kotlin with pure JVM / Room unit tests passing.
+- `[HARDWARE_PROVEN]`: Verified live via Android instrumented test on the physical Realme GT 6T (ColorOS / ARM64).
+
+#### Implementation Slices:
+- [ ] **Step 1 — Privacy Boundary Engine:**
+  - `[SPEC_RESOLVED]` Type-safe cloud boundary: `LocalDecisionPort(LocalDecisionInput)` vs `CloudDecisionPort(CloudSafeDecisionInput)`.
+  - `[SPEC_RESOLVED]` Strict runtime gate rejects `memory.localOnly == true` before cloud serialization.
+  - `[SPEC_RESOLVED]` Fail-closed deterministic PII redaction (`Result.failure` on ambiguity, unmatched tokens, or low confidence; zero partial leaks).
+  - `[x]` `[CODE_VERIFIED]` (Verified via `PrivacyBoundaryTest`: 5 unit tests passing in pure JVM `:domain`)
+  - `[ ]` `[HARDWARE_PROVEN]`
+- [ ] **Step 2 — Temporal State Engine:**
+  - `[SPEC_RESOLVED]` `ObstacleWindow` with immutable `startedAt` and fixed `expiresAt = startedAt + 48h` (inclusive: `now >= expiresAt`).
+  - `[SPEC_RESOLVED]` `ObstacleRelationship` (`SAME_EPISODE`, `NEW_EPISODE`, `CONTINUATION_OF_EXPIRED_EPISODE`, `UNKNOWN`). Expired continuation reports cannot reopen windows; `UNKNOWN` fails safe without pausing.
+  - `[SPEC_RESOLVED]` Tripartite tracking: Intervention execution (`EXECUTED`/`FAILED`) vs Behavioral compliance (`COMPLIANT`) vs Situational reality (`OBSTACLE_PRESENT`/`RESOLVED`).
+  - `[ ]` `[CODE_VERIFIED]`
+  - `[ ]` `[HARDWARE_PROVEN]`
+- [ ] **Step 3 — Intervention Governance Engine:**
+  - `[SPEC_RESOLVED]` Multi-stage notification lifecycle: `PROPOSED` → `POSTED` (budget consumed, 10h cooldown starts) → `ACCEPTED` / `DISMISSED` (no budget refunds).
+  - `[SPEC_RESOLVED]` Dynamic circadian budget: queried directly from SQLite records in window `[04:00_today, 04:00_tomorrow)` using device local timezone.
+  - `[SPEC_RESOLVED]` Analytical `EligibilityProjection`: `AvailableAt(timestamp)` vs `Blocked(reason)` (returns `Blocked` if `hasConcreteAction == false` or manual user action required).
+  - `[ ]` `[CODE_VERIFIED]`
+  - `[ ]` `[HARDWARE_PROVEN]`
+- [ ] **Step 4 — Dual Longitudinal Replay Harness:**
+  - `[SPEC_RESOLVED]` Deterministic `TestClock` simulation engine running real domain use cases against Room/SQLite test stores.
+  - `[SPEC_RESOLVED]` Scenario 1 (Positive Recovery Journey): Sub-minute 48h boundary assertion (`07:29` paused vs `07:30` expired), explicit recovery loop closure.
+  - `[SPEC_RESOLVED]` Scenario 2 (Rejection & Preference Pivot Journey): Rejection respected without re-proposal, preference updated to evening gym, suppression of dead morning alarm suggestions.
+  - `[ ]` `[CODE_VERIFIED]`
+  - `[ ]` `[HARDWARE_PROVEN]`
+- [ ] **Step 5 — Physical Device Validation:**
+  - `[SPEC_RESOLVED]` On-device test execution on Realme GT 6T (ColorOS, Android 16) across simulated process death, timezone offset, and background constraint verification.
+  - `[ ]` `[CODE_VERIFIED]`
+  - `[ ]` `[HARDWARE_PROVEN]`
+
 ---
 
 ## 6. OEM & Android Constraints Checklist

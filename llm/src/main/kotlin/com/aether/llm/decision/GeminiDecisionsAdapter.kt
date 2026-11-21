@@ -1,10 +1,10 @@
 package com.aether.llm.decision
 
+import com.aether.domain.decision.CloudDecisionPort
 import com.aether.domain.decision.DecisionAnswer
-import com.aether.domain.decision.DecisionPort
 import com.aether.domain.decision.DecisionQuestion
 import com.aether.domain.decision.DecisionResult
-import com.aether.domain.privacy.PiiRedactor
+import com.aether.domain.privacy.CloudSafeDecisionInput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -17,35 +17,25 @@ import kotlin.math.min
 /**
  * Cloud adapter for Google's Gemini Decisions API (v1beta/decisions).
  *
- * Evaluates operational decision questions with zero generated output tokens
- * and calibrated logit probabilities.
- *
- * Automatically routes input through [PiiRedactor] before transmission,
- * ensuring no personal identifiers leave the device unmasked.
+ * Implements [CloudDecisionPort].
+ * Compile-time enforcement: Only accepts certified [CloudSafeDecisionInput].
+ * Raw String, Memory, or LocalDecisionInput cannot compile or be transmitted.
  */
 class GeminiDecisionsAdapter(
-    private val piiRedactor: PiiRedactor? = null,
     private val apiKeyProvider: () -> String? = { null },
-) : DecisionPort {
+) : CloudDecisionPort {
 
     override suspend fun evaluate(
-        input: String,
+        input: CloudSafeDecisionInput,
         questions: Map<String, DecisionQuestion>,
     ): DecisionResult = withContext(Dispatchers.IO) {
         val apiKey = apiKeyProvider() ?: throw IllegalStateException("Gemini API key is not configured")
         val startTime = System.currentTimeMillis()
 
-        // 1. Redact PII locally before sending over the wire
-        val sanitizedInput = if (piiRedactor != null) {
-            piiRedactor.redact(input).redactedText
-        } else {
-            input
-        }
-
-        // 2. Build JSON request payload matching Google's Gemini Decisions API schema
+        // Build JSON request payload matching Google's Gemini Decisions API schema
         val requestJson = JSONObject()
         requestJson.put("model", "gemini-decision-1")
-        requestJson.put("input", sanitizedInput)
+        requestJson.put("input", input.sanitizedText)
 
         val questionsObj = JSONObject()
         for ((key, q) in questions) {

@@ -35,12 +35,18 @@ object DomainModule {
     ): NotificationPromptTool = NotificationPromptTool(context)
 
     @Provides
+    @Singleton
+    fun provideReasoningPort(): com.aether.domain.reasoning.ReasoningPort =
+        com.aether.domain.reasoning.DefaultReasoningEngine()
+
+    @Provides
     fun provideProcessFrictionNudge(
         threadRepository: com.aether.domain.thread.TrackedThreadRepository,
         actionRepository: com.aether.domain.action.ActionRecordRepository,
         restraintPolicy: RestraintPolicy,
         decisionPort: com.aether.domain.decision.DecisionPort,
         restraintConfigRepository: com.aether.domain.policy.RestraintConfigRepository,
+        reasoningPort: com.aether.domain.reasoning.ReasoningPort,
     ): com.aether.domain.action.ProcessFrictionNudge {
         return com.aether.domain.action.ProcessFrictionNudge(
             threadRepository = threadRepository,
@@ -48,6 +54,7 @@ object DomainModule {
             restraintPolicy = restraintPolicy,
             decisionPort = decisionPort,
             restraintConfigRepository = restraintConfigRepository,
+            reasoningPort = reasoningPort,
         )
     }
 
@@ -70,4 +77,18 @@ object DomainModule {
         threadRepository: com.aether.domain.thread.TrackedThreadRepository,
     ): com.aether.domain.action.EvaluateFollowUpUseCase =
         com.aether.domain.action.EvaluateFollowUpUseCase(actionRepository, threadRepository)
+
+    @Provides
+    fun provideProcessAmbientSignalUseCase(
+        threadRepository: com.aether.domain.thread.TrackedThreadRepository,
+        actionRepository: com.aether.domain.action.ActionRecordRepository,
+        restraintPolicy: RestraintPolicy,
+        restraintConfigRepository: com.aether.domain.policy.RestraintConfigRepository,
+    ): com.aether.domain.signal.ProcessAmbientSignalUseCase =
+        com.aether.domain.signal.ProcessAmbientSignalUseCase(
+            threadRepository,
+            actionRepository,
+            restraintPolicy,
+            restraintConfigRepository,
+        )
 }

@@ -4,6 +4,8 @@ import com.aether.domain.decision.DecisionAnswer
 import com.aether.domain.decision.DecisionPort
 import com.aether.domain.decision.DecisionQuestion
 import com.aether.domain.decision.DecisionResult
+import com.aether.domain.decision.LocalDecisionPort
+import com.aether.domain.privacy.LocalDecisionInput
 import com.aether.llm.NativeLlama
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,7 +23,12 @@ import kotlin.math.min
  * over the local GGUF model (e.g. feder-cr/jev or jevos-v4).
  */
 @Singleton
-class LocalJevDecisionAdapter @Inject constructor() : DecisionPort {
+class LocalJevDecisionAdapter @Inject constructor() : LocalDecisionPort, DecisionPort {
+
+    override suspend fun evaluate(
+        input: LocalDecisionInput,
+        questions: Map<String, DecisionQuestion>,
+    ): DecisionResult = evaluate(input.rawText, questions)
 
     @Volatile
     private var modelHandle: Long = 0L

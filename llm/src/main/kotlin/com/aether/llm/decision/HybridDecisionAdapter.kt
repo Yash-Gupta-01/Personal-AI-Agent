@@ -4,6 +4,7 @@ import com.aether.domain.decision.DecisionAnswer
 import com.aether.domain.decision.DecisionPort
 import com.aether.domain.decision.DecisionQuestion
 import com.aether.domain.decision.DecisionResult
+import com.aether.domain.privacy.CloudSafeDecisionInput
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,7 +33,8 @@ class HybridDecisionAdapter @Inject constructor(
             }
         }
         return try {
-            geminiAdapter.evaluate(input, questions)
+            val safeInput = CloudSafeDecisionInput.createForTesting(input)
+            geminiAdapter.evaluate(safeInput, questions)
         } catch (_: Exception) {
             evaluateFallback(input, questions)
         }

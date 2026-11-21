@@ -21,6 +21,9 @@ internal class RoomActionRecordRepository @Inject constructor(
     override fun observeForThread(threadId: String): Flow<List<ActionRecord>> =
         dao.observeForThread(threadId).map { entities -> entities.map { it.toDomain() } }
 
+    override suspend fun getLatestPendingFollowUp(): ActionRecord? =
+        dao.getLatestPendingFollowUp()?.toDomain()
+
     override suspend fun getById(id: String): ActionRecord? =
         dao.getById(id)?.toDomain()
 

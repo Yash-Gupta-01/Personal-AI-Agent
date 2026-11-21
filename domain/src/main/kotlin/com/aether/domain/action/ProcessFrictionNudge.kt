@@ -29,6 +29,7 @@ class ProcessFrictionNudge(
     private val restraintPolicy: RestraintPolicy,
     private val decisionPort: DecisionPort? = null,
     private val restraintConfigRepository: RestraintConfigRepository? = null,
+    private val reasoningPort: com.aether.domain.reasoning.ReasoningPort = com.aether.domain.reasoning.DefaultReasoningEngine(),
 ) {
 
     enum class RoutineEventType {
@@ -94,41 +95,28 @@ class ProcessFrictionNudge(
                     return null
                 }
 
-                val hasSleepDebt = updatedThread.knownBlockers.contains("sleep_debt")
-                val hour: Int
-                val minute: Int
-                val label: String
-                val nudgeTitle: String
-                val nudgeBody: String
-                val confirmText: String
+                // System 2 Causal Reflection via ReasoningPort
+                val threadContext = com.aether.domain.reasoning.ThreadContext(
+                    threadTopic = updatedThread.topic,
+                    threadTitle = updatedThread.title,
+                    recentObservations = listOf(content),
+                    knownBlockers = updatedThread.knownBlockers,
+                )
+                val proposal = reasoningPort.reflect(threadContext)
 
-                if (hasSleepDebt) {
-                    hour = 22
-                    minute = 30
-                    label = "Wind-Down"
-                    nudgeTitle = "Bedtime Wind-Down"
-                    nudgeBody = "Since lack of sleep held you back from the gym, would a 22:30 wind-down reminder help you get to bed earlier tonight?"
-                    confirmText = "Set 22:30 Wind-Down"
-                } else {
-                    hour = 7
-                    minute = 0
-                    label = "Gym"
-                    nudgeTitle = "Morning Gym Routine"
-                    nudgeBody = "I noticed you missed the gym today. Would a 07:00 alarm help get you there tomorrow?"
-                    confirmText = "Set 07:00 Alarm"
+                // If root cause was diagnosed, attach blocker
+                var threadToPersist = updatedThread
+                if (proposal.detectedRootCause != null && !threadToPersist.knownBlockers.contains(proposal.detectedRootCause)) {
+                    threadToPersist = threadToPersist.withBlocker(proposal.detectedRootCause, now)
+                    threadRepository.save(threadToPersist)
                 }
 
+                val action = proposal.proposedAction ?: return null
+
                 val proposedAction = ActionRecord.propose(
-                    threadId = updatedThread.id,
-                    toolName = "set_alarm",
-                    toolParams = mapOf(
-                        "hour" to hour.toString(),
-                        "minute" to minute.toString(),
-                        "label" to label,
-                        "nudge_title" to nudgeTitle,
-                        "nudge_body" to nudgeBody,
-                        "confirm_button_text" to confirmText,
-                    ),
+                    threadId = threadToPersist.id,
+                    toolName = action.toolName,
+                    toolParams = action.toolParams,
                     now = now,
                 )
                 actionRepository.save(proposedAction)

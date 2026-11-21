@@ -1,5 +1,8 @@
 package com.aether.domain.decision
 
+import com.aether.domain.privacy.CloudSafeDecisionInput
+import com.aether.domain.privacy.LocalDecisionInput
+
 sealed interface DecisionQuestion {
     val instructions: String
 
@@ -59,6 +62,31 @@ data class DecisionResult(
 interface DecisionPort {
     suspend fun evaluate(
         input: String,
+        questions: Map<String, DecisionQuestion>,
+    ): DecisionResult
+}
+
+/**
+ * On-device decision port accepting unredacted local inputs.
+ *
+ * Guaranteed never to leave the host device.
+ */
+interface LocalDecisionPort {
+    suspend fun evaluate(
+        input: LocalDecisionInput,
+        questions: Map<String, DecisionQuestion>,
+    ): DecisionResult
+}
+
+/**
+ * Outbound cloud decision port.
+ *
+ * Compile-time enforcement: Only accepts certified [CloudSafeDecisionInput].
+ * Raw [String], [LocalDecisionInput], or [com.aether.domain.memory.Memory] cannot compile.
+ */
+interface CloudDecisionPort {
+    suspend fun evaluate(
+        input: CloudSafeDecisionInput,
         questions: Map<String, DecisionQuestion>,
     ): DecisionResult
 }
