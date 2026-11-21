@@ -43,4 +43,16 @@ object LlmModule {
         // performance cores. Putting it on the IO pool would let it compete
         // with an unbounded number of blocking tasks.
         LlamaCppClient(modelStore, Dispatchers.Default)
+
+    @Provides
+    @Singleton
+    fun provideGeminiDecisionsAdapter(
+        piiRedactor: com.aether.domain.privacy.PiiRedactor,
+    ): com.aether.llm.decision.GeminiDecisionsAdapter =
+        com.aether.llm.decision.GeminiDecisionsAdapter(piiRedactor = piiRedactor)
+
+    @Provides
+    @Singleton
+    fun provideDecisionPort(hybridDecisionAdapter: com.aether.llm.decision.HybridDecisionAdapter): com.aether.domain.decision.DecisionPort =
+        hybridDecisionAdapter
 }

@@ -10,4 +10,12 @@
       night variant exists purely to avoid a white flash on launch in dark mode.
     -->
     <style name="Theme.Aether" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Translucent trampoline theme for instant, flicker-free OEM alarm dispatch (bypasses Android 12 BAL) -->
+    <style name="Theme.Aether.TranslucentTrampoline" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowDisablePreview">true</item>
+    </style>
 </resources>

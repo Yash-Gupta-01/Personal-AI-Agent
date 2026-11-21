@@ -2,12 +2,14 @@ package com.aether.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aether.domain.action.ProcessFrictionNudge
 import com.aether.domain.memory.ClassifyMemories
 import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryDay
 import com.aether.domain.memory.MemoryRepository
 import com.aether.domain.memory.MemorySource
 import com.aether.domain.memory.groupByDay
+import com.aether.tools.notification.NotificationPromptTool
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +37,8 @@ data class DashboardUiState(
 class DashboardViewModel @Inject constructor(
     private val repository: MemoryRepository,
     private val classifyMemories: ClassifyMemories,
+    private val processFrictionNudge: ProcessFrictionNudge? = null,
+    private val notificationPromptTool: NotificationPromptTool? = null,
 ) : ViewModel() {
 
     // Guards against several passes running at once. They would not corrupt
@@ -70,6 +74,32 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             repository.save(Memory.capture(content, source))
             classifyInBackground()
+
+            // Evaluate ambient routine friction & prompt proactive notification
+            processFrictionNudge?.let { nudge ->
+                val proposed = nudge.invoke(content)
+                if (proposed != null && notificationPromptTool != null) {
+                    val hour = proposed.toolParams["hour"]?.toIntOrNull() ?: 7
+                    val minute = proposed.toolParams["minute"]?.toIntOrNull() ?: 0
+                    val label = proposed.toolParams["label"] ?: "Gym"
+                    val title = proposed.toolParams["nudge_title"] ?: "Morning Gym Routine"
+                    val body = proposed.toolParams["nudge_body"]
+                        ?: "I noticed you missed the gym today. Would a %02d:%02d alarm help get you there tomorrow?".format(hour, minute)
+                    val confirmButtonText = proposed.toolParams["confirm_button_text"]
+                        ?: "Set %02d:%02d Alarm".format(hour, minute)
+
+                    notificationPromptTool.postNudge(
+                        notificationId = 1001,
+                        actionId = proposed.id,
+                        title = title,
+                        body = body,
+                        confirmButtonText = confirmButtonText,
+                        hour = hour,
+                        minute = minute,
+                        label = label,
+                    )
+                }
+            }
         }
     }
 

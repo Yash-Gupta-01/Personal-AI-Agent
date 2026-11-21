@@ -48,4 +48,10 @@ internal object NativeLlama {
 
     /** Generates up to [maxTokens], or null on failure. */
     external fun generate(handle: Long, prompt: String, maxTokens: Int): String?
+
+    /**
+     * Evaluates logits at the final token position across [candidates] in a single forward pass,
+     * returning the softmax probability distribution. Zero generated output tokens.
+     */
+    external fun scoreCandidates(handle: Long, prompt: String, candidates: Array<String>): FloatArray?
 }

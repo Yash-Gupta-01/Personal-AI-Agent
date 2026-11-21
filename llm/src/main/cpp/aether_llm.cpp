@@ -251,4 +251,107 @@ Java_com_aether_llm_NativeLlama_generate(
     return env->NewStringUTF(output.c_str());
 }
 
+/**
+ * Scores a closed set of candidate tokens at the prompt's final logit position.
+ *
+ * Runs a single forward pass over the prompt, extracts logits, applies
+ * softmax across candidate token pieces, and returns normalized probabilities.
+ * Generates zero output tokens.
+ */
+JNIEXPORT jfloatArray JNICALL
+Java_com_aether_llm_NativeLlama_scoreCandidates(
+        JNIEnv *env, jobject, jlong handle, jstring prompt, jobjectArray candidateWords) {
+    if (handle == 0 || candidateWords == nullptr) {
+        return nullptr;
+    }
+    auto *m = reinterpret_cast<AetherModel *>(handle);
+
+    llama_memory_clear(llama_get_memory(m->ctx), true);
+
+    const char *promptChars = env->GetStringUTFChars(prompt, nullptr);
+    const auto promptLen = static_cast<int32_t>(strlen(promptChars));
+
+    int32_t needed = -llama_tokenize(
+            m->vocab, promptChars, promptLen, nullptr, 0, true, true);
+    std::vector<llama_token> tokens(needed);
+    const int32_t nTokens = llama_tokenize(
+            m->vocab, promptChars, promptLen, tokens.data(),
+            static_cast<int32_t>(tokens.size()), true, true);
+    env->ReleaseStringUTFChars(prompt, promptChars);
+
+    if (nTokens <= 0) {
+        LOGE("tokenisation failed in scoreCandidates");
+        return nullptr;
+    }
+
+    const auto nCtx = static_cast<int32_t>(llama_n_ctx(m->ctx));
+    if (nTokens > nCtx) {
+        LOGE("prompt too long in scoreCandidates: %d > %d", nTokens, nCtx);
+        return nullptr;
+    }
+
+    tokens.resize(nTokens);
+    llama_batch batch = llama_batch_get_one(tokens.data(), nTokens);
+    if (llama_decode(m->ctx, batch) != 0) {
+        LOGE("decode failed in scoreCandidates");
+        return nullptr;
+    }
+
+    float *logits = llama_get_logits_ith(m->ctx, -1);
+    if (logits == nullptr) {
+        LOGE("null logits returned from llama_get_logits_ith");
+        return nullptr;
+    }
+
+    const int32_t nVocab = llama_vocab_n_tokens(m->vocab);
+    const jsize numCandidates = env->GetArrayLength(candidateWords);
+    if (numCandidates <= 0) {
+        return nullptr;
+    }
+
+    std::vector<float> candidateLogits(numCandidates, -1e9f);
+    float maxLogit = -1e9f;
+
+    for (jsize i = 0; i < numCandidates; i++) {
+        auto candStr = (jstring)env->GetObjectArrayElement(candidateWords, i);
+        if (candStr == nullptr) continue;
+        const char *candChars = env->GetStringUTFChars(candStr, nullptr);
+        const auto candLen = static_cast<int32_t>(strlen(candChars));
+
+        llama_token tok = 0;
+        int32_t n = llama_tokenize(m->vocab, candChars, candLen, &tok, 1, false, false);
+        env->ReleaseStringUTFChars(candStr, candChars);
+        env->DeleteLocalRef(candStr);
+
+        if (n > 0 && tok >= 0 && tok < nVocab) {
+            candidateLogits[i] = logits[tok];
+            if (candidateLogits[i] > maxLogit) {
+                maxLogit = candidateLogits[i];
+            }
+        }
+    }
+
+    float sumExp = 0.0f;
+    std::vector<float> probs(numCandidates, 0.0f);
+    for (jsize i = 0; i < numCandidates; i++) {
+        if (candidateLogits[i] > -1e8f) {
+            probs[i] = expf(candidateLogits[i] - maxLogit);
+            sumExp += probs[i];
+        }
+    }
+    if (sumExp > 0.0f) {
+        for (jsize i = 0; i < numCandidates; i++) {
+            probs[i] /= sumExp;
+        }
+    } else {
+        for (jsize i = 0; i < numCandidates; i++) {
+            probs[i] = 1.0f / numCandidates;
+        }
+    }
+
+    jfloatArray result = env->NewFloatArray(numCandidates);
+    env->SetFloatArrayRegion(result, 0, numCandidates, probs.data());
+    return result;
+}
+
 } // extern "C"

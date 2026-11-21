@@ -22,6 +22,7 @@ internal fun MemoryEntity.toDomain(): Memory = Memory(
     status = enumValueOrDefault(status, MemoryStatus.ACTIVE),
     createdAt = Instant.ofEpochMilli(createdAtEpochMillis),
     updatedAt = Instant.ofEpochMilli(updatedAtEpochMillis),
+    localOnly = localOnly,
 )
 
 internal fun Memory.toEntity(): MemoryEntity = MemoryEntity(
@@ -32,6 +33,7 @@ internal fun Memory.toEntity(): MemoryEntity = MemoryEntity(
     status = status.name,
     createdAtEpochMillis = createdAt.toEpochMilli(),
     updatedAtEpochMillis = updatedAt.toEpochMilli(),
+    localOnly = localOnly,
 )
 
 private inline fun <reified T : Enum<T>> enumValueOrDefault(name: String, default: T): T =

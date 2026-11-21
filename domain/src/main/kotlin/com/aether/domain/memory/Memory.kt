@@ -10,10 +10,9 @@ import java.util.UUID
  * as understanding improves rather than appended to endlessly, which is why
  * [updatedAt] is distinct from [createdAt] from the very first version.
  *
- * Fields that have no reader yet — importance, confidence, version history,
- * relationships to other memories — are deliberately absent. Adding a column
- * later is a trivial Room migration; carrying an unused one is a guess about
- * the future that has to be maintained in the meantime.
+ * [localOnly] enforces the strict privacy boundary: memories flagged as
+ * local-only are strictly barred from being passed to any outbound BYOK
+ * model call, even under local PII pseudonymization.
  */
 data class Memory(
     val id: String,
@@ -23,6 +22,7 @@ data class Memory(
     val status: MemoryStatus,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val localOnly: Boolean = false,
 ) {
     init {
         require(content.isNotBlank()) { "Memory content must not be blank" }
@@ -41,6 +41,10 @@ data class Memory(
     fun withType(newType: MemoryType, now: Instant = Instant.now()): Memory =
         copy(type = newType, updatedAt = now)
 
+    /** Returns a copy with updated privacy boundary [localOnly], advancing [updatedAt]. */
+    fun withLocalOnly(localOnly: Boolean, now: Instant = Instant.now()): Memory =
+        copy(localOnly = localOnly, updatedAt = now)
+
     companion object {
         /**
          * Creates a newly captured memory.
@@ -53,6 +57,7 @@ data class Memory(
             source: MemorySource,
             now: Instant = Instant.now(),
             id: String = UUID.randomUUID().toString(),
+            localOnly: Boolean = false,
         ): Memory = Memory(
             id = id,
             content = content.trim(),
@@ -61,6 +66,7 @@ data class Memory(
             status = MemoryStatus.ACTIVE,
             createdAt = now,
             updatedAt = now,
+            localOnly = localOnly,
         )
     }
 }

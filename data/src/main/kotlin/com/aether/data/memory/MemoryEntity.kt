@@ -51,4 +51,7 @@ data class MemoryEntity(
      */
     @ColumnInfo(name = "classification_attempts", defaultValue = "0")
     val classificationAttempts: Int = 0,
+
+    @ColumnInfo(name = "local_only", defaultValue = "0")
+    val localOnly: Boolean = false,
 )

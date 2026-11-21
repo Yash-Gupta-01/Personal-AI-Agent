@@ -1,22 +1,19 @@
 package com.aether.di
 
+import android.content.Context
 import com.aether.domain.llm.LlmClient
 import com.aether.domain.memory.ClassifyMemories
 import com.aether.domain.memory.MemoryRepository
+import com.aether.domain.policy.DefaultRestraintPolicy
+import com.aether.domain.policy.RestraintPolicy
+import com.aether.tools.notification.NotificationPromptTool
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
 
-/**
- * Constructs the domain's use cases.
- *
- * They are assembled here rather than annotated with `@Inject` because
- * `:domain` depends on nothing but Kotlin and coroutines — pulling
- * `javax.inject` into it would make the layer that must stay framework-free
- * depend on a framework. The cost is one `@Provides` per use case, in the only
- * module that already knows about every layer.
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object DomainModule {
@@ -26,4 +23,23 @@ object DomainModule {
         repository: MemoryRepository,
         llmClient: LlmClient,
     ): ClassifyMemories = ClassifyMemories(repository, llmClient)
+
+    @Provides
+    @Singleton
+    fun provideRestraintPolicy(): RestraintPolicy = DefaultRestraintPolicy()
+
+    @Provides
+    @Singleton
+    fun provideNotificationPromptTool(
+        @ApplicationContext context: Context,
+    ): NotificationPromptTool = NotificationPromptTool(context)
+
+    @Provides
+    fun provideProcessFrictionNudge(
+        threadRepository: com.aether.domain.thread.TrackedThreadRepository,
+        actionRepository: com.aether.domain.action.ActionRecordRepository,
+        restraintPolicy: RestraintPolicy,
+        decisionPort: com.aether.domain.decision.DecisionPort,
+    ): com.aether.domain.action.ProcessFrictionNudge =
+        com.aether.domain.action.ProcessFrictionNudge(threadRepository, actionRepository, restraintPolicy, decisionPort)
 }
