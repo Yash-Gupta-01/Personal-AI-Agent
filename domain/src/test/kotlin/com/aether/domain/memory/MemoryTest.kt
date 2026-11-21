@@ -75,4 +75,14 @@ class MemoryTest {
         // typed text does not.
         assertEquals(MemorySource.MANUAL_VOICE, memory.source)
     }
+
+    @Test
+    fun `capture defaults localOnly to false and withLocalOnly updates it`() {
+        val memory = Memory.capture("Normal note", MemorySource.MANUAL_TEXT, now)
+        assertEquals(false, memory.localOnly)
+
+        val privateMemory = memory.withLocalOnly(true, now.plusSeconds(10))
+        assertEquals(true, privateMemory.localOnly)
+        assertEquals(now.plusSeconds(10), privateMemory.updatedAt)
+    }
 }

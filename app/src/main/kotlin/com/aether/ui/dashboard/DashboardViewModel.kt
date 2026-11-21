@@ -1,18 +1,36 @@
 package com.aether.ui.dashboard
 
+import android.content.Context
+import android.content.Intent
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aether.domain.action.ActionRecord
+import com.aether.domain.action.ActionRecordRepository
+import com.aether.domain.action.DismissActionUseCase
+import com.aether.domain.action.EvaluateFollowUpUseCase
+import com.aether.domain.action.ExecuteActionUseCase
+import com.aether.domain.action.ProcessFrictionNudge
+import com.aether.domain.memory.ClassifyMemories
 import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryDay
 import com.aether.domain.memory.MemoryRepository
 import com.aether.domain.memory.MemorySource
 import com.aether.domain.memory.groupByDay
+import com.aether.domain.timeline.TimelineDay
+import com.aether.domain.timeline.buildTimeline
+import com.aether.tools.alarm.SetAlarmTool
+import com.aether.tools.notification.NotificationPromptTool
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import javax.inject.Inject
 
 /**
@@ -24,24 +42,141 @@ import javax.inject.Inject
  * so being offline is normal operation, not degradation.
  */
 data class DashboardUiState(
+    val timelineDays: List<TimelineDay> = emptyList(),
     val days: List<MemoryDay> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = days.isEmpty()
+    val isEmpty: Boolean get() = timelineDays.isEmpty() && days.isEmpty()
 }
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val repository: MemoryRepository,
+    private val classifyMemories: ClassifyMemories,
+    private val processFrictionNudge: ProcessFrictionNudge? = null,
+    private val notificationPromptTool: NotificationPromptTool? = null,
+    private val restraintConfigRepository: com.aether.domain.policy.RestraintConfigRepository? = null,
+    private val threadRepository: com.aether.domain.thread.TrackedThreadRepository? = null,
+    private val actionRecordRepository: ActionRecordRepository? = null,
+    private val executeActionUseCase: ExecuteActionUseCase? = null,
+    private val dismissActionUseCase: DismissActionUseCase? = null,
+    private val evaluateFollowUpUseCase: EvaluateFollowUpUseCase? = null,
 ) : ViewModel() {
 
+    // Guards against several passes running at once. They would not corrupt
+    // anything — inference is serialised inside the client — but each capture
+    // would queue another full batch behind the running one, so a burst of
+    // captures would do the same work many times over.
+    private val classifying = Mutex()
+
+    init {
+        // Clears whatever accumulated while the app was closed. Classification
+        // has no UI of its own: the type simply appears on the card, because
+        // saving a classified memory makes Room re-emit the dashboard's flow.
+        classifyInBackground()
+    }
+
     val uiState: StateFlow<DashboardUiState> =
-        repository.observeActive()
-            .map { memories -> DashboardUiState(days = memories.groupByDay()) }
-            .stateIn(
+        combine(
+            repository.observeActive(),
+            actionRecordRepository?.observeAll() ?: flowOf(emptyList()),
+        ) { memories, actions ->
+            DashboardUiState(
+                timelineDays = buildTimeline(memories, actions),
+                days = memories.groupByDay(),
+            )
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = DashboardUiState(),
+        )
+
+    val restraintConfig: StateFlow<com.aether.domain.policy.RestraintConfig> =
+        restraintConfigRepository?.observeConfig()
+            ?.stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-                initialValue = DashboardUiState(),
-            )
+                initialValue = com.aether.domain.policy.RestraintConfig(),
+            ) ?: MutableStateFlow(com.aether.domain.policy.RestraintConfig())
+
+    val activeThreads: StateFlow<List<com.aether.domain.thread.TrackedThread>> =
+        threadRepository?.observeActive()
+            ?.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = emptyList(),
+            ) ?: MutableStateFlow<List<com.aether.domain.thread.TrackedThread>>(emptyList())
+
+    val pendingActions: StateFlow<List<ActionRecord>> =
+        actionRecordRepository?.observePending()
+            ?.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = emptyList(),
+            ) ?: MutableStateFlow(emptyList())
+
+    val pendingFollowUps: StateFlow<List<ActionRecord>> =
+        actionRecordRepository?.observePendingFollowUps()
+            ?.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = emptyList(),
+            ) ?: MutableStateFlow(emptyList())
+
+    fun executeAction(actionId: String, context: Context) {
+        viewModelScope.launch {
+            val executed = executeActionUseCase?.invoke(actionId) ?: return@launch
+            NotificationManagerCompat.from(context).cancel(1001)
+
+            val hour = executed.toolParams["hour"]?.toIntOrNull() ?: 7
+            val minute = executed.toolParams["minute"]?.toIntOrNull() ?: 0
+            val label = executed.toolParams["label"] ?: "Aether Routine"
+
+            val clockIntent = SetAlarmTool.buildIntent(hour, minute, label).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                if (clockIntent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(clockIntent)
+                }
+            } catch (_: Exception) {
+                // Ignore if device clock app is missing
+            }
+        }
+    }
+
+    fun dismissAction(actionId: String, context: Context) {
+        viewModelScope.launch {
+            dismissActionUseCase?.invoke(actionId)
+            NotificationManagerCompat.from(context).cancel(1001)
+        }
+    }
+
+    fun respondToFollowUp(actionId: String, response: String, context: Context) {
+        viewModelScope.launch {
+            evaluateFollowUpUseCase?.invoke(actionId, response)
+            NotificationManagerCompat.from(context).cancel(1002)
+        }
+    }
+
+    fun updateRestraintConfig(config: com.aether.domain.policy.RestraintConfig) {
+        viewModelScope.launch {
+            restraintConfigRepository?.updateConfig(config)
+        }
+    }
+
+    fun clearThreadCooldown(threadId: String) {
+        viewModelScope.launch {
+            val thread = threadRepository?.getById(threadId) ?: return@launch
+            threadRepository.save(thread.copy(cooldownUntil = null))
+        }
+    }
+
+    fun removeThreadBlocker(threadId: String, blocker: String) {
+        viewModelScope.launch {
+            val thread = threadRepository?.getById(threadId) ?: return@launch
+            threadRepository.save(thread.copy(knownBlockers = thread.knownBlockers.filterNot { it == blocker }))
+        }
+    }
 
     /**
      * Stores a captured thought.
@@ -51,8 +186,60 @@ class DashboardViewModel @Inject constructor(
      */
     fun capture(content: String, source: MemorySource = MemorySource.MANUAL_TEXT) {
         if (content.isBlank()) return
+        android.util.Log.i("Aether", "Captured thought: '$content' (source=$source)")
         viewModelScope.launch {
             repository.save(Memory.capture(content, source))
+            classifyInBackground()
+
+            // Evaluate ambient routine friction & prompt proactive notification
+            processFrictionNudge?.let { nudge ->
+                val proposed = nudge.invoke(content)
+                android.util.Log.i("Aether", "Friction nudge evaluated for '$content' -> proposedActionId=${proposed?.id}")
+                if (proposed != null && notificationPromptTool != null) {
+                    val hour = proposed.toolParams["hour"]?.toIntOrNull() ?: 7
+                    val minute = proposed.toolParams["minute"]?.toIntOrNull() ?: 0
+                    val label = proposed.toolParams["label"] ?: "Gym"
+                    val title = proposed.toolParams["nudge_title"] ?: "Morning Gym Routine"
+                    val body = proposed.toolParams["nudge_body"]
+                        ?: "I noticed you missed the gym today. Would a %02d:%02d alarm help get you there tomorrow?".format(hour, minute)
+                    val confirmButtonText = proposed.toolParams["confirm_button_text"]
+                        ?: "Set %02d:%02d Alarm".format(hour, minute)
+
+                    notificationPromptTool.postNudge(
+                        notificationId = 1001,
+                        actionId = proposed.id,
+                        title = title,
+                        body = body,
+                        confirmButtonText = confirmButtonText,
+                        hour = hour,
+                        minute = minute,
+                        label = label,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Classifies whatever is pending, if a pass is not already running.
+     *
+     * Scoped to the ViewModel, so leaving the app mid-inference abandons the
+     * pass. That is safe rather than lossy: the queue lives in SQLite, so the
+     * next launch picks up exactly where this left off.
+     *
+     * ponytail: no WorkManager. Classification needs the app open, which is
+     * fine while the only consumer of a type is a card the user is looking at.
+     * Add one when something acts on memories while the app is closed — a
+     * reminder, a proactive nudge — not before.
+     */
+    private fun classifyInBackground() {
+        if (!classifying.tryLock()) return
+        viewModelScope.launch {
+            try {
+                classifyMemories.invoke()
+            } finally {
+                classifying.unlock()
+            }
         }
     }
 

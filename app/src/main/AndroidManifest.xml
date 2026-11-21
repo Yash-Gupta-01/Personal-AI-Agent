@@ -4,14 +4,28 @@
     <!-- Requested at the moment the user first taps Speak, never on launch. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Sets alarms on the device Clock app without manual user opening. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
+    <!-- Delivers ambient nudge and follow-up check-in notifications. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!--
-      Without this, package visibility filtering on Android 11+ hides every
-      RecognitionService, so SpeechRecognizer.isRecognitionAvailable() returns
-      false even when a recogniser is installed.
+      Used for exactly one thing: downloading the on-device model. Aether sends
+      nothing anywhere — inference, storage and classification are all local.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      Without this, package visibility filtering on Android 11+ hides recogniser
+      and clock services, returning null or false.
     -->
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_ALARM" />
         </intent>
     </queries>
 
@@ -31,6 +45,44 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Translucent Activity executing OEM alarm dispatch (bypasses Android 12 BAL) -->
+        <activity
+            android:name=".action.AlarmActionTrampolineActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Aether.TranslucentTrampoline" />
+
+        <receiver
+            android:name=".action.NotificationDismissReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".action.NotificationReplyReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.aether.action.NOTIFICATION_REPLY" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".action.FollowUpCheckInReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.aether.action.FOLLOW_UP" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".action.AmbientSignalReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT" />
+                <action android:name="com.aether.action.TEST_USER_PRESENT" />
+                <action android:name="android.intent.action.ALARM_DISMISSED" />
+                <action android:name="com.coloros.alarmclock.ALARM_DISMISSED" />
+                <action android:name="com.oplus.alarmclock.ALARM_DISMISS" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

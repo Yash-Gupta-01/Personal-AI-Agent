@@ -24,6 +24,7 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(libs.androidx.core.ktx)
 
     // Speech is exposed as a Flow, so coroutines is an api dependency: callers
     // in :app consume the Flow type directly.
