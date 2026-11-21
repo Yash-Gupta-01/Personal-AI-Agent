@@ -3,9 +3,11 @@ package com.aether.ui.dashboard
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -15,6 +17,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aether.ui.capture.QuickCaptureSheet
 import com.aether.ui.model.ModelSetupSheet
+import com.aether.ui.settings.RestraintSettingsSheet
 
 object DashboardTestTags {
     const val CAPTURE_FAB = "dashboard_capture_fab"
@@ -50,8 +54,14 @@ fun DashboardRoute(
     // collectAsStateWithLifecycle, not collectAsState: collection stops when
     // the app is backgrounded rather than holding a database subscription open.
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val restraintConfig by viewModel.restraintConfig.collectAsStateWithLifecycle()
+    val activeThreads by viewModel.activeThreads.collectAsStateWithLifecycle()
+
     var isCapturing by remember { mutableStateOf(false) }
     var isSettingUpModel by remember { mutableStateOf(false) }
+    var isConfiguringRestraint by remember { mutableStateOf(false) }
+    val restraintSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -64,6 +74,9 @@ fun DashboardRoute(
                     Text(text = "Aether", style = MaterialTheme.typography.titleLarge)
                 },
                 actions = {
+                    IconButton(onClick = { isConfiguringRestraint = true }) {
+                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Restraint Boundaries & Quiet Hours")
+                    }
                     TextButton(
                         onClick = { isSettingUpModel = true },
                         modifier = Modifier.testTag(DashboardTestTags.MODEL_SETUP_ACTION),
@@ -113,5 +126,17 @@ fun DashboardRoute(
 
     if (isSettingUpModel) {
         ModelSetupSheet(onDismiss = { isSettingUpModel = false })
+    }
+
+    if (isConfiguringRestraint) {
+        RestraintSettingsSheet(
+            config = restraintConfig,
+            activeThreads = activeThreads,
+            sheetState = restraintSheetState,
+            onDismissRequest = { isConfiguringRestraint = false },
+            onUpdateConfig = viewModel::updateRestraintConfig,
+            onClearThreadCooldown = viewModel::clearThreadCooldown,
+            onRemoveBlocker = viewModel::removeThreadBlocker,
+        )
     }
 }

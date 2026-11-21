@@ -11,6 +11,7 @@ import com.aether.domain.memory.MemorySource
 import com.aether.domain.memory.groupByDay
 import com.aether.tools.notification.NotificationPromptTool
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -39,6 +40,8 @@ class DashboardViewModel @Inject constructor(
     private val classifyMemories: ClassifyMemories,
     private val processFrictionNudge: ProcessFrictionNudge? = null,
     private val notificationPromptTool: NotificationPromptTool? = null,
+    private val restraintConfigRepository: com.aether.domain.policy.RestraintConfigRepository? = null,
+    private val threadRepository: com.aether.domain.thread.TrackedThreadRepository? = null,
 ) : ViewModel() {
 
     // Guards against several passes running at once. They would not corrupt
@@ -63,6 +66,42 @@ class DashboardViewModel @Inject constructor(
                 initialValue = DashboardUiState(),
             )
 
+    val restraintConfig: StateFlow<com.aether.domain.policy.RestraintConfig> =
+        restraintConfigRepository?.observeConfig()
+            ?.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = com.aether.domain.policy.RestraintConfig(),
+            ) ?: MutableStateFlow(com.aether.domain.policy.RestraintConfig())
+
+    val activeThreads: StateFlow<List<com.aether.domain.thread.TrackedThread>> =
+        threadRepository?.observeActive()
+            ?.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = emptyList(),
+            ) ?: MutableStateFlow<List<com.aether.domain.thread.TrackedThread>>(emptyList())
+
+    fun updateRestraintConfig(config: com.aether.domain.policy.RestraintConfig) {
+        viewModelScope.launch {
+            restraintConfigRepository?.updateConfig(config)
+        }
+    }
+
+    fun clearThreadCooldown(threadId: String) {
+        viewModelScope.launch {
+            val thread = threadRepository?.getById(threadId) ?: return@launch
+            threadRepository.save(thread.copy(cooldownUntil = null))
+        }
+    }
+
+    fun removeThreadBlocker(threadId: String, blocker: String) {
+        viewModelScope.launch {
+            val thread = threadRepository?.getById(threadId) ?: return@launch
+            threadRepository.save(thread.copy(knownBlockers = thread.knownBlockers.filterNot { it == blocker }))
+        }
+    }
+
     /**
      * Stores a captured thought.
      *
@@ -71,6 +110,7 @@ class DashboardViewModel @Inject constructor(
      */
     fun capture(content: String, source: MemorySource = MemorySource.MANUAL_TEXT) {
         if (content.isBlank()) return
+        android.util.Log.i("Aether", "Captured thought: '$content' (source=$source)")
         viewModelScope.launch {
             repository.save(Memory.capture(content, source))
             classifyInBackground()
@@ -78,6 +118,7 @@ class DashboardViewModel @Inject constructor(
             // Evaluate ambient routine friction & prompt proactive notification
             processFrictionNudge?.let { nudge ->
                 val proposed = nudge.invoke(content)
+                android.util.Log.i("Aether", "Friction nudge evaluated for '$content' -> proposedActionId=${proposed?.id}")
                 if (proposed != null && notificationPromptTool != null) {
                     val hour = proposed.toolParams["hour"]?.toIntOrNull() ?: 7
                     val minute = proposed.toolParams["minute"]?.toIntOrNull() ?: 0

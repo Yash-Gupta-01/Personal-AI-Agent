@@ -17,3 +17,8 @@ captures/
 # Local LLM model files: multi-GB GGUF weights never belong in git
 *.gguf
 models/
+
+# Secrets & Environment configs (never commit API keys)
+.env
+*.env
+secrets.properties

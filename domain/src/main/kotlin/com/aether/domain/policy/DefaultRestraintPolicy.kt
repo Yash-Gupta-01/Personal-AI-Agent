@@ -35,10 +35,12 @@ class DefaultRestraintPolicy : RestraintPolicy {
             return RestraintVerdict.BLOCKED_DAILY_BUDGET_EXHAUSTED
         }
 
-        // 3. Quiet hours check
-        val localTime = now.atZone(zone).toLocalTime()
-        if (isQuietHours(localTime, config.quietHoursStart, config.quietHoursEnd)) {
-            return RestraintVerdict.BLOCKED_QUIET_HOURS
+        // 3. Quiet hours check (if enabled by user)
+        if (config.quietHoursEnabled) {
+            val localTime = now.atZone(zone).toLocalTime()
+            if (isQuietHours(localTime, config.quietHoursStart, config.quietHoursEnd)) {
+                return RestraintVerdict.BLOCKED_QUIET_HOURS
+            }
         }
 
         // 4. Active cooldown on this thread

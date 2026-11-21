@@ -23,6 +23,7 @@ class ProcessFrictionNudge(
     private val actionRepository: ActionRecordRepository,
     private val restraintPolicy: RestraintPolicy,
     private val decisionPort: DecisionPort? = null,
+    private val restraintConfigRepository: com.aether.domain.policy.RestraintConfigRepository? = null,
 ) {
 
     suspend fun invoke(
@@ -41,6 +42,8 @@ class ProcessFrictionNudge(
         val updatedThread = thread.recordMiss(now)
         threadRepository.save(updatedThread)
 
+        val config = restraintConfigRepository?.getConfig() ?: com.aether.domain.policy.RestraintConfig()
+
         // Evaluate restraint policy
         val verdict = restraintPolicy.evaluate(
             now = now,
@@ -49,6 +52,7 @@ class ProcessFrictionNudge(
             threadCooldownUntil = updatedThread.cooldownUntil,
             consecutiveDismissals = 0,
             hasConcreteAction = true,
+            config = config,
         )
 
         if (verdict != RestraintVerdict.PERMITTED) {

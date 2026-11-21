@@ -46,6 +46,12 @@ internal abstract class DataModule {
     @Singleton
     abstract fun bindPiiRedactor(impl: RoomPiiRedactor): PiiRedactor
 
+    @Binds
+    @Singleton
+    abstract fun bindRestraintConfigRepository(
+        impl: com.aether.data.policy.SharedPreferencesRestraintConfigRepository,
+    ): com.aether.domain.policy.RestraintConfigRepository
+
     companion object {
 
         @Provides

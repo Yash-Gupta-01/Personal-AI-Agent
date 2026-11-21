@@ -40,6 +40,14 @@ object DomainModule {
         actionRepository: com.aether.domain.action.ActionRecordRepository,
         restraintPolicy: RestraintPolicy,
         decisionPort: com.aether.domain.decision.DecisionPort,
-    ): com.aether.domain.action.ProcessFrictionNudge =
-        com.aether.domain.action.ProcessFrictionNudge(threadRepository, actionRepository, restraintPolicy, decisionPort)
+        restraintConfigRepository: com.aether.domain.policy.RestraintConfigRepository,
+    ): com.aether.domain.action.ProcessFrictionNudge {
+        return com.aether.domain.action.ProcessFrictionNudge(
+            threadRepository = threadRepository,
+            actionRepository = actionRepository,
+            restraintPolicy = restraintPolicy,
+            decisionPort = decisionPort,
+            restraintConfigRepository = restraintConfigRepository,
+        )
+    }
 }

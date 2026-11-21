@@ -368,4 +368,23 @@ class DefaultRestraintPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun `quiet hours disabled by user permits intervention even at 02_30 night`() {
+        val now = instantAt(LocalTime.of(2, 30))
+        val verdict = policy.evaluate(
+            now = now,
+            zone = utcZone,
+            todayInterventionCount = 0,
+            threadCooldownUntil = null,
+            consecutiveDismissals = 0,
+            hasConcreteAction = true,
+            config = RestraintConfig(
+                quietHoursEnabled = false,
+                quietHoursStart = LocalTime.of(22, 0),
+                quietHoursEnd = LocalTime.of(7, 0),
+            ),
+        )
+        assertEquals(RestraintVerdict.PERMITTED, verdict)
+    }
 }

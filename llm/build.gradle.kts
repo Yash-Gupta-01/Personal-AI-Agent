@@ -1,3 +1,5 @@
+import java.util.Properties
+
 // Infrastructure layer: on-device inference via llama.cpp.
 //
 // Implements the LlmClient port declared in :domain, so the rest of the app
@@ -16,6 +18,24 @@ android {
     defaultConfig {
         minSdk = 28
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Inject GEMINI_API_KEY from .env, local.properties, or system environment
+        val envFile = rootProject.file(".env")
+        val localPropsFile = rootProject.file("local.properties")
+        var apiKey = System.getenv("GEMINI_API_KEY") ?: ""
+        if (apiKey.isEmpty() && envFile.exists()) {
+            envFile.forEachLine { line ->
+                val trimmed = line.trim()
+                if (trimmed.startsWith("GEMINI_API_KEY=")) {
+                    apiKey = trimmed.substringAfter("=").trim().removeSurrounding("\"").removeSurrounding("'")
+                }
+            }
+        }
+        if (apiKey.isEmpty() && localPropsFile.exists()) {
+            val props = Properties().apply { load(localPropsFile.inputStream()) }
+            apiKey = props.getProperty("gemini.api.key") ?: props.getProperty("GEMINI_API_KEY") ?: ""
+        }
+        buildConfigField("String", "GEMINI_API_KEY", "\"$apiKey\"")
 
         ndk {
             // arm64-v8a only. Every other ABI is dead weight in the APK and
@@ -48,6 +68,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 }
 

@@ -6,6 +6,7 @@ import java.time.ZoneId
 
 data class RestraintConfig(
     val maxDailyInterventions: Int = 1,
+    val quietHoursEnabled: Boolean = true,
     val quietHoursStart: LocalTime = LocalTime.of(22, 0),
     val quietHoursEnd: LocalTime = LocalTime.of(7, 0),
     val maxConsecutiveDismissalsBeforeCooldown: Int = 3,
