@@ -69,22 +69,7 @@ fun DashboardRoute(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(text = "Aether", style = MaterialTheme.typography.titleLarge)
-                        val primaryThread = activeThreads.firstOrNull()
-                        if (primaryThread != null) {
-                            val subtitle = buildString {
-                                append(primaryThread.title)
-                                if (primaryThread.consecutiveSuccesses > 0) append(" • Streak ${primaryThread.consecutiveSuccesses}")
-                                primaryThread.knownBlockers.firstOrNull()?.let { append(" • Blocked: $it") }
-                            }
-                            Text(
-                                text = subtitle,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
+                    Text(text = "Aether", style = MaterialTheme.typography.titleLarge)
                 },
                 actions = {
                     IconButton(onClick = { isConfiguringRestraint = true }) {
