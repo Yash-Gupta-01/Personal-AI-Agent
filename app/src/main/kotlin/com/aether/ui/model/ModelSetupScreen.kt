@@ -57,8 +57,7 @@ internal fun ModelSetupSheet(
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "Aether classifies your thoughts using a model that runs entirely on " +
-                    "this phone. Nothing is sent anywhere.",
+                text = "Aether uses an on-device decision model to evaluate routine friction and guide actions entirely on this phone. Nothing is sent anywhere.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

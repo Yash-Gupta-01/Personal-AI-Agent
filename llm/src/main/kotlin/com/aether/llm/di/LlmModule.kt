@@ -56,6 +56,11 @@ object LlmModule {
 
     @Provides
     @Singleton
+    fun provideLocalJevDecisionAdapter(modelStore: ModelStore): com.aether.llm.decision.LocalJevDecisionAdapter =
+        com.aether.llm.decision.LocalJevDecisionAdapter(modelStore)
+
+    @Provides
+    @Singleton
     fun provideLocalDecisionPort(adapter: com.aether.llm.decision.LocalJevDecisionAdapter): com.aether.domain.decision.LocalDecisionPort =
         adapter
 

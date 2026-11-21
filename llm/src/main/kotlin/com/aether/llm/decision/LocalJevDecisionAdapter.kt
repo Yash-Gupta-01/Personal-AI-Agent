@@ -23,7 +23,9 @@ import kotlin.math.min
  * over the local GGUF model (e.g. feder-cr/jev or jevos-v4).
  */
 @Singleton
-class LocalJevDecisionAdapter @Inject constructor() : LocalDecisionPort, DecisionPort {
+class LocalJevDecisionAdapter @Inject constructor(
+    private val modelStore: com.aether.llm.ModelStore? = null,
+) : LocalDecisionPort, DecisionPort {
 
     override suspend fun evaluate(
         input: LocalDecisionInput,
@@ -33,7 +35,14 @@ class LocalJevDecisionAdapter @Inject constructor() : LocalDecisionPort, Decisio
     @Volatile
     private var modelHandle: Long = 0L
 
-    val isModelLoaded: Boolean get() = modelHandle != 0L
+    val isModelLoaded: Boolean
+        get() {
+            if (modelHandle != 0L) return true
+            if (modelStore?.isModelPresent() == true) {
+                loadModel(modelStore.modelFile.absolutePath)
+            }
+            return modelHandle != 0L
+        }
 
     /**
      * Loads a decision model GGUF from [modelPath].
