@@ -9,6 +9,9 @@ interface ActionRecordRepository {
     /** Emits pending actions (PROPOSED or APPROVED), newest first. */
     fun observePending(): Flow<List<ActionRecord>>
 
+    /** Emits executed actions awaiting follow-up evaluation, newest first. */
+    fun observePendingFollowUps(): Flow<List<ActionRecord>>
+
     /** Emits action history for a specific thread, newest first. */
     fun observeForThread(threadId: String): Flow<List<ActionRecord>>
 

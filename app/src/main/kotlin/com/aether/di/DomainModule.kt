@@ -50,4 +50,24 @@ object DomainModule {
             restraintConfigRepository = restraintConfigRepository,
         )
     }
+
+    @Provides
+    fun provideExecuteActionUseCase(
+        actionRepository: com.aether.domain.action.ActionRecordRepository,
+    ): com.aether.domain.action.ExecuteActionUseCase =
+        com.aether.domain.action.ExecuteActionUseCase(actionRepository)
+
+    @Provides
+    fun provideDismissActionUseCase(
+        actionRepository: com.aether.domain.action.ActionRecordRepository,
+        threadRepository: com.aether.domain.thread.TrackedThreadRepository,
+    ): com.aether.domain.action.DismissActionUseCase =
+        com.aether.domain.action.DismissActionUseCase(actionRepository, threadRepository)
+
+    @Provides
+    fun provideEvaluateFollowUpUseCase(
+        actionRepository: com.aether.domain.action.ActionRecordRepository,
+        threadRepository: com.aether.domain.thread.TrackedThreadRepository,
+    ): com.aether.domain.action.EvaluateFollowUpUseCase =
+        com.aether.domain.action.EvaluateFollowUpUseCase(actionRepository, threadRepository)
 }

@@ -1,7 +1,15 @@
 package com.aether.ui.dashboard
 
+import android.content.Context
+import android.content.Intent
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aether.domain.action.ActionRecord
+import com.aether.domain.action.ActionRecordRepository
+import com.aether.domain.action.DismissActionUseCase
+import com.aether.domain.action.EvaluateFollowUpUseCase
+import com.aether.domain.action.ExecuteActionUseCase
 import com.aether.domain.action.ProcessFrictionNudge
 import com.aether.domain.memory.ClassifyMemories
 import com.aether.domain.memory.Memory
@@ -9,6 +17,7 @@ import com.aether.domain.memory.MemoryDay
 import com.aether.domain.memory.MemoryRepository
 import com.aether.domain.memory.MemorySource
 import com.aether.domain.memory.groupByDay
+import com.aether.tools.alarm.SetAlarmTool
 import com.aether.tools.notification.NotificationPromptTool
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +51,10 @@ class DashboardViewModel @Inject constructor(
     private val notificationPromptTool: NotificationPromptTool? = null,
     private val restraintConfigRepository: com.aether.domain.policy.RestraintConfigRepository? = null,
     private val threadRepository: com.aether.domain.thread.TrackedThreadRepository? = null,
+    private val actionRecordRepository: ActionRecordRepository? = null,
+    private val executeActionUseCase: ExecuteActionUseCase? = null,
+    private val dismissActionUseCase: DismissActionUseCase? = null,
+    private val evaluateFollowUpUseCase: EvaluateFollowUpUseCase? = null,
 ) : ViewModel() {
 
     // Guards against several passes running at once. They would not corrupt
@@ -81,6 +94,58 @@ class DashboardViewModel @Inject constructor(
                 started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
                 initialValue = emptyList(),
             ) ?: MutableStateFlow<List<com.aether.domain.thread.TrackedThread>>(emptyList())
+
+    val pendingActions: StateFlow<List<ActionRecord>> =
+        actionRecordRepository?.observePending()
+            ?.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = emptyList(),
+            ) ?: MutableStateFlow(emptyList())
+
+    val pendingFollowUps: StateFlow<List<ActionRecord>> =
+        actionRecordRepository?.observePendingFollowUps()
+            ?.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = emptyList(),
+            ) ?: MutableStateFlow(emptyList())
+
+    fun executeAction(actionId: String, context: Context) {
+        viewModelScope.launch {
+            val executed = executeActionUseCase?.invoke(actionId) ?: return@launch
+            NotificationManagerCompat.from(context).cancel(1001)
+
+            val hour = executed.toolParams["hour"]?.toIntOrNull() ?: 7
+            val minute = executed.toolParams["minute"]?.toIntOrNull() ?: 0
+            val label = executed.toolParams["label"] ?: "Aether Routine"
+
+            val clockIntent = SetAlarmTool.buildIntent(hour, minute, label).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                if (clockIntent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(clockIntent)
+                }
+            } catch (_: Exception) {
+                // Ignore if device clock app is missing
+            }
+        }
+    }
+
+    fun dismissAction(actionId: String, context: Context) {
+        viewModelScope.launch {
+            dismissActionUseCase?.invoke(actionId)
+            NotificationManagerCompat.from(context).cancel(1001)
+        }
+    }
+
+    fun respondToFollowUp(actionId: String, response: String, context: Context) {
+        viewModelScope.launch {
+            evaluateFollowUpUseCase?.invoke(actionId, response)
+            NotificationManagerCompat.from(context).cancel(1002)
+        }
+    }
 
     fun updateRestraintConfig(config: com.aether.domain.policy.RestraintConfig) {
         viewModelScope.launch {

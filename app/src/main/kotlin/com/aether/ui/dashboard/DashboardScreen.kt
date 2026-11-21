@@ -7,18 +7,27 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,9 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.aether.domain.action.ActionRecord
 import com.aether.domain.memory.Memory
 import com.aether.domain.memory.MemoryDay
 import com.aether.domain.memory.MemorySource
@@ -49,11 +60,16 @@ import java.time.LocalDate
 @Composable
 internal fun DashboardContent(
     state: DashboardUiState,
+    pendingAction: ActionRecord? = null,
+    pendingFollowUp: ActionRecord? = null,
+    onExecuteAction: (String) -> Unit = {},
+    onDismissAction: (String) -> Unit = {},
+    onRespondFollowUp: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     onDelete: (Memory) -> Unit = {},
 ) {
-    if (state.isEmpty) {
+    if (state.isEmpty && pendingAction == null && pendingFollowUp == null) {
         EmptyState(modifier = modifier.padding(contentPadding))
         return
     }
@@ -63,12 +79,141 @@ internal fun DashboardContent(
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (pendingAction != null) {
+            item(key = "pending-action-${pendingAction.id}") {
+                ActiveInterventionCard(
+                    action = pendingAction,
+                    onExecute = onExecuteAction,
+                    onDismiss = onDismissAction,
+                )
+            }
+        }
+
+        if (pendingFollowUp != null) {
+            item(key = "pending-followup-${pendingFollowUp.id}") {
+                ActiveFollowUpCard(
+                    action = pendingFollowUp,
+                    onRespond = onRespondFollowUp,
+                )
+            }
+        }
+
         state.days.forEach { day ->
             item(key = "header-${day.date}") {
                 DayHeader(day = day)
             }
             items(items = day.memories, key = { it.id }) { memory ->
                 MemoryCard(memory = memory, onDelete = { onDelete(memory) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveInterventionCard(
+    action: ActionRecord,
+    onExecute: (String) -> Unit,
+    onDismiss: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val title = action.toolParams["nudge_title"] ?: "Routine Suggestion"
+    val body = action.toolParams["nudge_body"] ?: "Would an alarm help tomorrow?"
+    val confirmText = action.toolParams["confirm_button_text"] ?: "Confirm"
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { onDismiss(action.id) }) {
+                    Text("Dismiss")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = { onExecute(action.id) }) {
+                    Text(confirmText)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveFollowUpCard(
+    action: ActionRecord,
+    onRespond: (String, String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Morning Check-In",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Text(
+                text = "Did your alarm get you to the gym this morning?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(onClick = { onRespond(action.id, "Yes, went and completed it!") }) {
+                    Text("Yes!")
+                }
+                OutlinedButton(onClick = { onRespond(action.id, "Closed it due to lack of sleep") }) {
+                    Text("Slept late")
+                }
+                OutlinedButton(onClick = { onRespond(action.id, "Feeling sore and tired") }) {
+                    Text("Sore")
+                }
             }
         }
     }

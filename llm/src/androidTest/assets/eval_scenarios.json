@@ -1,0 +1,117 @@
+{
+  "benchmark_name": "Aether Longitudinal & Operational Evaluation Suite",
+  "version": "2.0",
+  "total_cases": 100,
+  "single_turn_cases": [
+    { "id": 1, "input": "didn't get to go to gym today", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Gym Friction" },
+    { "id": 2, "input": "missed gym again because i overslept", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Gym Friction" },
+    { "id": 3, "input": "couldn't make it to gym again today", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Gym Friction" },
+    { "id": 4, "input": "skipped workout today feeling lazy", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Gym Friction" },
+    { "id": 5, "input": "was unable to go to gym this morning", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Gym Friction" },
+    { "id": 6, "input": "missed leg day because meeting ran over", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Gym Friction" },
+    { "id": 7, "input": "failed to get my workout in before dinner", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Gym Friction" },
+    { "id": 8, "input": "wanted to go for a run but stayed on the couch", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Gym Friction" },
+    { "id": 9, "input": "skipped the gym third time this week", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Gym Friction" },
+    { "id": 10, "input": "could not finish my exercises feeling drained", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Gym Friction" },
+
+    { "id": 11, "input": "stayed up until 3am browsing reddit again", "expected_event": "FRICTION", "thread": "sleep", "action_expected": true, "group": "Sleep Friction" },
+    { "id": 12, "input": "slept only 4 hours feeling terrible", "expected_event": "FRICTION", "thread": "sleep", "action_expected": true, "group": "Sleep Friction" },
+    { "id": 13, "input": "couldn't fall asleep until past midnight", "expected_event": "FRICTION", "thread": "sleep", "action_expected": true, "group": "Sleep Friction" },
+    { "id": 14, "input": "woke up exhausted and groggy", "expected_event": "FRICTION", "thread": "sleep", "action_expected": true, "group": "Sleep Friction" },
+    { "id": 15, "input": "scrolling in bed past midnight again", "expected_event": "FRICTION", "thread": "sleep", "action_expected": true, "group": "Sleep Friction" },
+    { "id": 16, "input": "insomnia again tonight tossing and turning", "expected_event": "FRICTION", "thread": "sleep", "action_expected": true, "group": "Sleep Friction" },
+    { "id": 17, "input": "went to bed at 2am and missed my alarm", "expected_event": "FRICTION", "thread": "sleep", "action_expected": true, "group": "Sleep Friction" },
+    { "id": 18, "input": "binged youtube in bed until 4 in the morning", "expected_event": "FRICTION", "thread": "sleep", "action_expected": true, "group": "Sleep Friction" },
+    { "id": 19, "input": "sleep schedule is completely ruined", "expected_event": "FRICTION", "thread": "sleep", "action_expected": true, "group": "Sleep Friction" },
+    { "id": 20, "input": "closed the alarm and fell back asleep for 2 hours", "expected_event": "FRICTION", "thread": "sleep", "action_expected": true, "group": "Sleep Friction" },
+
+    { "id": 21, "input": "couldn't finish the report before eod deadline", "expected_event": "FRICTION", "thread": "work", "action_expected": true, "group": "Work/Health Friction" },
+    { "id": 22, "input": "missed the project standup meeting", "expected_event": "FRICTION", "thread": "work", "action_expected": true, "group": "Work/Health Friction" },
+    { "id": 23, "input": "forgot to take blood pressure medicine today", "expected_event": "FRICTION", "thread": "health", "action_expected": true, "group": "Work/Health Friction" },
+    { "id": 24, "input": "skipped lunch and feel a terrible headache coming", "expected_event": "FRICTION", "thread": "health", "action_expected": true, "group": "Work/Health Friction" },
+    { "id": 25, "input": "didn't take my vitamins this morning", "expected_event": "FRICTION", "thread": "health", "action_expected": true, "group": "Work/Health Friction" },
+    { "id": 26, "input": "failed to submit sprint timesheet on time", "expected_event": "FRICTION", "thread": "work", "action_expected": true, "group": "Work/Health Friction" },
+    { "id": 27, "input": "drank zero water today feeling completely dehydrated", "expected_event": "FRICTION", "thread": "health", "action_expected": true, "group": "Work/Health Friction" },
+    { "id": 28, "input": "couldn't focus at work distracted all afternoon", "expected_event": "FRICTION", "thread": "work", "action_expected": true, "group": "Work/Health Friction" },
+    { "id": 29, "input": "forgot to log my expenses for the client dinner", "expected_event": "FRICTION", "thread": "work", "action_expected": true, "group": "Work/Health Friction" },
+    { "id": 30, "input": "skipped breakfast again rushing out the door", "expected_event": "FRICTION", "thread": "health", "action_expected": true, "group": "Work/Health Friction" },
+
+    { "id": 31, "input": "went to gym and crushed my deadlift PR", "expected_event": "SUCCESS", "thread": "gym", "action_expected": false, "group": "Wins (Streak Reset)" },
+    { "id": 32, "input": "completed morning run 5k in 24 mins", "expected_event": "SUCCESS", "thread": "gym", "action_expected": false, "group": "Wins (Streak Reset)" },
+    { "id": 33, "input": "had 8 hours of solid deep sleep feeling energized", "expected_event": "SUCCESS", "thread": "sleep", "action_expected": false, "group": "Wins (Streak Reset)" },
+    { "id": 34, "input": "woke up on time at 6:30am feeling fresh", "expected_event": "SUCCESS", "thread": "sleep", "action_expected": false, "group": "Wins (Streak Reset)" },
+    { "id": 35, "input": "finished all sprint tickets early", "expected_event": "SUCCESS", "thread": "work", "action_expected": false, "group": "Wins (Streak Reset)" },
+    { "id": 36, "input": "hit all my protein goals for the day", "expected_event": "SUCCESS", "thread": "health", "action_expected": false, "group": "Wins (Streak Reset)" },
+    { "id": 37, "input": "meditated for 20 minutes feeling peaceful", "expected_event": "SUCCESS", "thread": "health", "action_expected": false, "group": "Wins (Streak Reset)" },
+    { "id": 38, "input": "delivered the presentation without any hiccups", "expected_event": "SUCCESS", "thread": "work", "action_expected": false, "group": "Wins (Streak Reset)" },
+    { "id": 39, "input": "drank 3 liters of water today feeling great", "expected_event": "SUCCESS", "thread": "health", "action_expected": false, "group": "Wins (Streak Reset)" },
+    { "id": 40, "input": "hit 10000 steps before 5pm", "expected_event": "SUCCESS", "thread": "gym", "action_expected": false, "group": "Wins (Streak Reset)" },
+
+    { "id": 41, "input": "postgres vacuum reclaims dead tuples", "expected_event": "NONE", "thread": "none", "action_expected": false, "group": "Facts (Silence)" },
+    { "id": 42, "input": "kotlin data classes generate equals and hashcode", "expected_event": "NONE", "thread": "none", "action_expected": false, "group": "Facts (Silence)" },
+    { "id": 43, "input": "room uses wal mode by default on android", "expected_event": "NONE", "thread": "none", "action_expected": false, "group": "Facts (Silence)" },
+    { "id": 44, "input": "utc has no daylight saving", "expected_event": "NONE", "thread": "none", "action_expected": false, "group": "Facts (Silence)" },
+    { "id": 45, "input": "priya got promoted to senior designer last week", "expected_event": "NONE", "thread": "none", "action_expected": false, "group": "Facts (Silence)" },
+    { "id": 46, "input": "amma knee surgery scheduled for the 14th", "expected_event": "NONE", "thread": "none", "action_expected": false, "group": "Facts (Silence)" },
+    { "id": 47, "input": "i like my tea without sugar", "expected_event": "NONE", "thread": "none", "action_expected": false, "group": "Preferences (Silence)" },
+    { "id": 48, "input": "prefer window seats on flights", "expected_event": "NONE", "thread": "none", "action_expected": false, "group": "Preferences (Silence)" },
+    { "id": 49, "input": "aether is an offline first assistant app", "expected_event": "NONE", "thread": "none", "action_expected": false, "group": "Facts (Silence)" },
+    { "id": 50, "input": "planning to run a marathon next spring", "expected_event": "NONE", "thread": "none", "action_expected": false, "group": "Thoughts (Silence)" },
+
+    { "id": 51, "input": "didn't go to gym today", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Ambiguous & Contextual" },
+    { "id": 52, "input": "didn't go to gym because i had a fever", "expected_event": "OBSTACLE", "thread": "gym", "action_expected": false, "group": "Ambiguous & Contextual" },
+    { "id": 53, "input": "gym was closed today", "expected_event": "OBSTACLE", "thread": "gym", "action_expected": false, "group": "Ambiguous & Contextual" },
+    { "id": 54, "input": "skipped gym because i had an important meeting", "expected_event": "OBSTACLE", "thread": "gym", "action_expected": false, "group": "Ambiguous & Contextual" },
+    { "id": 55, "input": "didn't feel like going today, but i'll go tomorrow", "expected_event": "FRICTION", "thread": "gym", "action_expected": true, "group": "Ambiguous & Contextual" },
+    { "id": 56, "input": "i deliberately took a rest day", "expected_event": "SUCCESS", "thread": "gym", "action_expected": false, "group": "Ambiguous & Contextual" },
+    { "id": 57, "input": "couldn't sleep because there was construction outside", "expected_event": "OBSTACLE", "thread": "sleep", "action_expected": false, "group": "Ambiguous & Contextual" },
+    { "id": 58, "input": "stayed up late finishing an urgent assignment", "expected_event": "OBSTACLE", "thread": "sleep", "action_expected": false, "group": "Ambiguous & Contextual" },
+    { "id": 59, "input": "didn't finish the report, but deadline was extended", "expected_event": "OBSTACLE", "thread": "work", "action_expected": false, "group": "Ambiguous & Contextual" },
+    { "id": 60, "input": "i missed the meeting because manager cancelled it", "expected_event": "OBSTACLE", "thread": "work", "action_expected": false, "group": "Ambiguous & Contextual" }
+  ],
+  "multi_event_sequences": [
+    {
+      "sequence_id": "seq_gym_recovery_061_063",
+      "description": "Streak Tracking & Recovery: Two misses followed by a success must reset consecutive misses",
+      "steps": [
+        { "day": 1, "input": "didn't get to go to gym today", "expected_misses": 1, "expected_successes": 0, "nudge_posted": true },
+        { "day": 2, "input": "missed gym again today", "expected_misses": 2, "expected_successes": 0, "nudge_posted": true },
+        { "day": 3, "input": "went to gym and crushed my workout today", "expected_misses": 0, "expected_successes": 1, "nudge_posted": false }
+      ]
+    },
+    {
+      "sequence_id": "seq_preference_shift_064",
+      "description": "Routine Adaptation: Misses gym morning routine, switches to evening workouts",
+      "steps": [
+        { "day": 1, "input": "missed morning gym again", "expected_misses": 1, "nudge_posted": true },
+        { "day": 2, "input": "i have switched to evening workouts from now on", "expected_routine": "evening", "nudge_posted": false }
+      ]
+    },
+    {
+      "sequence_id": "seq_deduplication_070",
+      "description": "Intra-Day Deduplication: Multiple complaints on the same day must not fire duplicate nudges",
+      "steps": [
+        { "day": 1, "time": "14:00", "input": "missed gym today feeling bad", "nudge_posted": true },
+        { "day": 1, "time": "16:00", "input": "still thinking about how i skipped the gym today", "nudge_posted": false, "reason": "DEDUPLICATED_TODAY_LIMIT" }
+      ]
+    },
+    {
+      "sequence_id": "seq_dismissal_cooldown_081_082",
+      "description": "Restraint Learning: Three consecutive dismissals triggers auto-cooldown backoff",
+      "steps": [
+        { "day": 1, "input": "missed gym today", "action": "DISMISSED", "cooldown_active": false },
+        { "day": 2, "input": "missed gym today", "action": "DISMISSED", "cooldown_active": false },
+        { "day": 3, "input": "missed gym today", "action": "DISMISSED", "cooldown_active": true, "reason": "3_CONSECUTIVE_DISMISSALS" }
+      ]
+    },
+    {
+      "sequence_id": "seq_causal_pivot_091",
+      "description": "Second-Order Causal Reflection: Alarm dismissed due to sleep debt pivots to bedtime wind-down",
+      "steps": [
+        { "day": 1, "input": "didn't get to go to gym today", "action_proposed": "07:00 Gym Alarm" },
+        { "day": 2, "input": "closed the 7am alarm because i was up until 3am due to lack of sleep", "blocker_diagnosed": "sleep_debt" },
+        { "day": 3, "input": "couldn't make it to gym again today", "action_proposed": "22:30 Wind-Down Reminder" }
+      ]
+    }
+  ]
+}

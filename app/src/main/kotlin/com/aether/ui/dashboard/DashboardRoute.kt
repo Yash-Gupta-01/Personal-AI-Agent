@@ -56,7 +56,10 @@ fun DashboardRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val restraintConfig by viewModel.restraintConfig.collectAsStateWithLifecycle()
     val activeThreads by viewModel.activeThreads.collectAsStateWithLifecycle()
+    val pendingActions by viewModel.pendingActions.collectAsStateWithLifecycle()
+    val pendingFollowUps by viewModel.pendingFollowUps.collectAsStateWithLifecycle()
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     var isCapturing by remember { mutableStateOf(false) }
     var isSettingUpModel by remember { mutableStateOf(false) }
     var isConfiguringRestraint by remember { mutableStateOf(false) }
@@ -97,6 +100,11 @@ fun DashboardRoute(
     ) { innerPadding ->
         DashboardContent(
             state = state,
+            pendingAction = pendingActions.firstOrNull(),
+            pendingFollowUp = pendingFollowUps.firstOrNull(),
+            onExecuteAction = { actionId -> viewModel.executeAction(actionId, context) },
+            onDismissAction = { actionId -> viewModel.dismissAction(actionId, context) },
+            onRespondFollowUp = { actionId, reply -> viewModel.respondToFollowUp(actionId, reply, context) },
             contentPadding = innerPadding,
             onDelete = { memory ->
                 viewModel.delete(memory)

@@ -15,6 +15,9 @@ internal class RoomActionRecordRepository @Inject constructor(
     override fun observePending(): Flow<List<ActionRecord>> =
         dao.observePending().map { entities -> entities.map { it.toDomain() } }
 
+    override fun observePendingFollowUps(): Flow<List<ActionRecord>> =
+        dao.observePendingFollowUps().map { entities -> entities.map { it.toDomain() } }
+
     override fun observeForThread(threadId: String): Flow<List<ActionRecord>> =
         dao.observeForThread(threadId).map { entities -> entities.map { it.toDomain() } }
 
